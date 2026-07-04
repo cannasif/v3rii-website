@@ -1,0 +1,312 @@
+@import "tailwindcss";
+
+html, body {
+  background: radial-gradient(circle at top, #0c0f1c 0%, #1a0e2b 45%, #0d0a14 100%) !important;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  color: #f8fafc;
+  transition: background 300ms ease, color 250ms ease;
+}
+
+#root {
+  min-height: 100vh;
+  background: radial-gradient(circle at top, #0c0f1c 0%, #1a0e2b 45%, #0d0a14 100%) !important;
+}
+
+html.light,
+html.light body,
+html.light #root {
+  background:
+    radial-gradient(circle at 16% 6%, rgba(56, 189, 248, 0.35) 0%, transparent 33%),
+    radial-gradient(circle at 82% 10%, rgba(236, 72, 153, 0.28) 0%, transparent 36%),
+    radial-gradient(circle at 55% 75%, rgba(99, 102, 241, 0.18) 0%, transparent 42%),
+    linear-gradient(180deg, #dff6ff 0%, #eaf2ff 46%, #edf2ff 100%) !important;
+  color: #111827;
+}
+
+html.light body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.2;
+  background: repeating-linear-gradient(
+    180deg,
+    transparent 0px,
+    transparent 2px,
+    rgba(14, 116, 144, 0.16) 3px,
+    rgba(14, 116, 144, 0.16) 4px
+  );
+}
+
+
+@keyframes glitch {
+  0% { transform: translate(0); opacity: 1; text-shadow: 0 0 0 transparent; }
+  20% { transform: translate(-2px, 2px); opacity: 0.8; text-shadow: -2px 2px #00eaff; }
+  40% { transform: translate(3px, -3px); opacity: 0.7; text-shadow: 3px -3px #00eaff; }
+  60% { transform: translate(-1px, 1px); opacity: 0.9; text-shadow: -1px 1px #00eaff; }
+  80% { transform: translate(2px, -2px); opacity: 0.8; text-shadow: 2px -2px #00eaff; }
+  100% { transform: translate(0); opacity: 1; text-shadow: 0 0 0 transparent; }
+}
+
+.animate-glitch {
+  animation: glitch 0.25s ease-in-out;
+}
+
+/* ===================================== */
+/*  CODEPEN STYLE CYBER GLITCH LAYER     */
+/* ===================================== */
+
+.cyber-glitch {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 95% 100%, 95% 90%, 85% 90%, 85% 100%, 8% 100%, 0 70%);
+  background: rgba(0, 255, 255, 0.25);
+  z-index: 0;
+  display: none;
+   color: transparent;     /* yazı gözükmesin */
+  pointer-events: none;
+}
+
+.cyber-glitch:before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  clip-path: inherit;
+  background: rgba(0, 255, 255, 0.5);
+  z-index: -1;
+}
+
+.cyber-glitch.animate {
+  display: block;
+  animation: cyberGlitchAnim 0.3s steps(2, end);
+}
+
+@keyframes cyberGlitchAnim {
+  0% {
+    clip-path: polygon(0 2%, 100% 2%, 100% 95%, 95% 95%, 95% 90%, 85% 90%, 85% 95%, 8% 95%, 0 70%);
+    transform: translate(-3px, 0);
+  }
+  15% {
+    clip-path: polygon(0 78%, 100% 78%, 100% 100%, 95% 100%, 95% 90%, 85% 90%, 85% 100%, 8% 100%, 0 78%);
+    transform: translate(3px, 0);
+  }
+  30% {
+    clip-path: polygon(0 44%, 100% 44%, 100% 54%, 95% 54%, 95% 54%, 85% 54%, 85% 54%, 8% 54%, 0 54%);
+    transform: translate(0, 0);
+  }
+  45% {
+    clip-path: polygon(0 40%, 100% 40%, 100% 85%, 95% 85%, 95% 85%, 85% 85%, 85% 85%, 8% 85%, 0 70%);
+  }
+  60% {
+    clip-path: polygon(0 63%, 100% 63%, 100% 80%, 95% 80%, 95% 80%, 85% 80%, 85% 80%, 8% 80%, 0 70%);
+    transform: translate(-1px, 0);
+  }
+  100% {
+    clip-path: polygon(0 0, 100% 0, 100% 0, 95% 0, 95% 0, 85% 0, 85% 0, 8% 0, 0 0);
+    transform: translate(0, 0);
+  }
+}
+
+/* =============================== */
+/*   CYBERPUNK GLITCH EFFECT       */
+/* =============================== */
+
+.cyberpunk-glitch {
+  position: relative;
+  display: inline-block;
+  cursor: default;
+}
+
+/* RGB ghost layers */
+.cyberpunk-glitch::before,
+.cyberpunk-glitch::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Green layer */
+.cyberpunk-glitch::before {
+  color: #00ff6a;
+  z-index: -1;
+}
+
+/* Purple/magenta layer */
+.cyberpunk-glitch::after {
+  color: #ff00e1;
+  z-index: -1;
+}
+
+/* Aktif glitch */
+.cyberpunk-glitch.glitch-active::before {
+  animation: cyberpunk-before 1s steps(2, end);
+}
+.cyberpunk-glitch.glitch-active::after {
+  animation: cyberpunk-after 1s steps(2, end);
+}
+
+@keyframes cyberpunk-before {
+  0% { opacity: 1; transform: translate(0); }
+  10% { transform: translate(-3px, -2px); }
+  20% { transform: translate(3px, 1px); }
+  30% { transform: translate(-2px, 2px); opacity: 0.6; }
+  40% { transform: translate(4px, -1px); opacity: 0.8; }
+  100% { opacity: 0; transform: translate(0); }
+}
+
+@keyframes cyberpunk-after {
+  0% { opacity: 1; transform: translate(0); }
+  15% { transform: translate(3px, 2px); }
+  25% { transform: translate(-3px, -1px); }
+  35% { transform: translate(2px, -2px); opacity: 0.7; }
+  50% { transform: translate(-4px, 2px); opacity: 0.9; }
+  100% { opacity: 0; transform: translate(0); }
+}
+/* ============================
+     CYBERPUNK GLITCH BORDER
+============================ */
+@keyframes cyberBoxGlitch {
+  0%   { clip-path: inset(0 0 0 0); }
+  15%  { clip-path: inset(10% 0 0 0); }
+  28%  { clip-path: inset(0 20% 0 0); }
+  45%  { clip-path: inset(0 0 30% 0); }
+  60%  { clip-path: inset(0 0 0 15%); }
+  75%  { clip-path: inset(5% 0 10% 0); }
+  100% { clip-path: inset(0 0 0 0); }
+}
+
+.animate-glitch-box {
+  animation: cyberBoxGlitch 0.9s infinite steps(2, end);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+/* ============================
+   HOVER-ONLY LOGO CYBER FX
+============================ */
+
+.logo-hover-fx {
+  position: absolute;
+  isolation: isolate;
+}
+
+.logo-hover-image {
+  display: block;
+  transition: filter 280ms ease;
+  will-change: transform, filter;
+}
+
+.logo-glitch-layer {
+  opacity: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  will-change: transform, opacity, filter;
+}
+
+.logo-glitch-cyan {
+  filter: hue-rotate(154deg) saturate(1.55) brightness(1.08);
+}
+
+.logo-glitch-red {
+  filter: hue-rotate(-22deg) saturate(1.65) brightness(1.04);
+}
+
+.logo-hover-fx:hover .logo-hover-image {
+  animation: logoHoverSmoothShake 0.95s steps(2, end) infinite, logoHoverColorShift 1.9s ease-in-out infinite;
+}
+
+.logo-hover-fx:hover .logo-glitch-cyan {
+  animation: logoLayerCyan 0.36s steps(2, end) infinite;
+}
+
+.logo-hover-fx:hover .logo-glitch-red {
+  animation: logoLayerRed 0.36s steps(2, end) infinite;
+}
+
+@keyframes logoHoverSmoothShake {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  20% { transform: translate3d(-2.4px, 1.3px, 0) rotate(-0.36deg); }
+  40% { transform: translate3d(2.8px, -1.4px, 0) rotate(0.4deg); }
+  60% { transform: translate3d(-2px, -0.7px, 0) rotate(-0.28deg); }
+  80% { transform: translate3d(2.2px, 1.5px, 0) rotate(0.33deg); }
+  100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+}
+
+@keyframes logoHoverColorShift {
+  0% {
+    filter:
+      hue-rotate(0deg)
+      saturate(1.2)
+      contrast(1.15)
+      drop-shadow(0 0 10px rgba(79, 246, 255, 0.45))
+      drop-shadow(0 0 18px rgba(255, 90, 60, 0.34));
+  }
+  50% {
+    filter:
+      hue-rotate(-34deg)
+      saturate(1.45)
+      contrast(1.24)
+      brightness(1.12)
+      drop-shadow(0 0 14px rgba(79, 246, 255, 0.66))
+      drop-shadow(0 0 24px rgba(255, 72, 72, 0.52));
+  }
+  100% {
+    filter:
+      hue-rotate(0deg)
+      saturate(1.2)
+      contrast(1.15)
+      drop-shadow(0 0 10px rgba(79, 246, 255, 0.45))
+      drop-shadow(0 0 18px rgba(255, 90, 60, 0.34));
+  }
+}
+
+@keyframes logoLayerCyan {
+  0%, 100% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  20% {
+    opacity: 0.55;
+    transform: translate(-7px, 2px);
+  }
+  48% {
+    opacity: 0.36;
+    transform: translate(4.5px, -2.2px);
+  }
+  74% {
+    opacity: 0.5;
+    transform: translate(-5.4px, -1.1px);
+  }
+}
+
+@keyframes logoLayerRed {
+  0%, 100% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  24% {
+    opacity: 0.52;
+    transform: translate(7px, -2.3px);
+  }
+  52% {
+    opacity: 0.32;
+    transform: translate(-4px, 2.4px);
+  }
+  78% {
+    opacity: 0.48;
+    transform: translate(5px, 1.4px);
+  }
+}
+
+
