@@ -22,8 +22,8 @@ export default function Navbar({ language, onLanguageChange, theme, onThemeToggl
   const scrollToSection = useScrollToSection(80)
   const isLight = theme === 'light'
   const navText = {
-    tr: { home: 'Ana Sayfa', products: 'Ürünler', about: 'Hakkımızda', contact: 'İletişim' },
-    en: { home: 'Home', products: 'Products', about: 'About', contact: 'Contact' }
+    tr: { home: 'Ana Sayfa', products: 'Ürünler', platform: 'API Katmanı', about: 'Hakkımızda', contact: 'İletişim' },
+    en: { home: 'Home', products: 'Products', platform: 'API Layer', about: 'About', contact: 'Contact' }
   }[language]
 
   useEffect(() => {
@@ -59,6 +59,10 @@ export default function Navbar({ language, onLanguageChange, theme, onThemeToggl
 
             <CyberButton scrolled={scrolled} theme={theme} onClick={() => scrollToSection('products')}>
               {navText.products}
+            </CyberButton>
+
+            <CyberButton scrolled={scrolled} theme={theme} onClick={() => scrollToSection('platform')}>
+              {navText.platform}
             </CyberButton>
           </motion.div>
 

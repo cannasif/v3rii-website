@@ -29,7 +29,7 @@ export default function FadeInSection({
     <motion.div
       ref={ref}
       style={{ y: parallaxY, scale: parallaxScale, rotateZ: parallaxRotate }}
-      className="will-change-transform"
+      className="relative will-change-transform"
     >
       <motion.div
         initial={{ opacity: 0, y: fadeOffset }}

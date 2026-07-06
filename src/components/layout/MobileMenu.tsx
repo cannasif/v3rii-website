@@ -28,6 +28,7 @@ export default function MobileMenu({
     tr: {
       home: "Ana Sayfa",
       products: "Ürünler",
+      platform: "API Katmanı",
       about: "Hakkımızda",
       contact: "İletişim",
       mode: "Mod"
@@ -38,6 +39,7 @@ export default function MobileMenu({
     en: {
       home: "Home",
       products: "Products",
+      platform: "API Layer",
       about: "About",
       contact: "Contact",
       mode: "Mode",
@@ -131,6 +133,7 @@ export default function MobileMenu({
             {[
               { id: 'home', text: labels.home },
               { id: 'products', text: labels.products },
+              { id: 'platform', text: labels.platform },
               { id: 'about', text: labels.about },
               { id: 'contact', text: labels.contact },
             ].map((item, idx) => (

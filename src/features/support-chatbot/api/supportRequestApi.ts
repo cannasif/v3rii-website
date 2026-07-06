@@ -45,6 +45,50 @@ export async function sendSupportRequest(payload: SupportRequestPayload): Promis
   return { success: true, message: result.message, ticketNo: result.data?.ticketNo }
 }
 
+export async function sendWebsiteContactRequest(payload: {
+  product: SupportProductKey
+  name: string
+  email: string
+  company?: string
+  message: string
+  language: string
+}): Promise<SupportRequestResult> {
+  const response = await fetch(`${API_BASE_URL}/api/support/tickets`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json'
+    },
+    body: JSON.stringify({
+      product: productMap[payload.product],
+      intent: 'demo',
+      customerName: payload.name,
+      customerEmail: payload.email,
+      companyName: payload.company,
+      details: payload.message,
+      transcriptJson: JSON.stringify([
+        {
+          sender: 'user',
+          text: payload.message,
+          meta: 'website-contact-form',
+          language: payload.language
+        }
+      ]),
+      requiresHandoff: true,
+      handoffReason: 'Tanıtım sitesi iletişim formu üzerinden demo/proje talebi geldi.',
+      source: 'website-contact-form'
+    })
+  })
+
+  const result = (await response.json()) as ApiResponse<{ ticketNo: string }>
+
+  if (!response.ok || !result.success) {
+    throw new Error(result.message || 'Contact request failed')
+  }
+
+  return { success: true, message: result.message, ticketNo: result.data?.ticketNo }
+}
+
 export async function trackChatEvent(eventType: string, payload: { product?: SupportProductKey; intent?: string; sessionId?: string; metadata?: unknown }) {
   await fetch(`${API_BASE_URL}/api/analytics/events`, {
     method: 'POST',

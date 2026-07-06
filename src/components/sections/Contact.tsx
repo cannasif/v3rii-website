@@ -2,6 +2,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useState } from 'react'
 import { Star, ChevronDown } from 'lucide-react'
 import type { Language, Theme } from '../../App'
+import { sendWebsiteContactRequest } from '../../features/support-chatbot/api/supportRequestApi'
+import type { SupportProductKey } from '../../features/support-chatbot/types/support-chatbot.types'
 
 type ContactField = 'name' | 'email' | 'product' | 'message'
 
@@ -23,6 +25,7 @@ export default function Contact({ language, theme }: Props) {
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [ticketNo, setTicketNo] = useState<string | undefined>()
   const [feedbackRating, setFeedbackRating] = useState(0)
   const [hoverRating, setHoverRating] = useState(0)
   const [feedbackMessage, setFeedbackMessage] = useState('')
@@ -46,10 +49,16 @@ export default function Contact({ language, theme }: Props) {
         message: 'Proje detaylarınızı yazınız'
       },
       selectDefault: 'Seçiniz',
-      options: ['CRM Sistemi', 'B2B Platform', 'Depo Otomasyonu'],
+      options: [
+        { label: 'CRM Sistemi', value: 'crm' },
+        { label: 'B2B Platform', value: 'b2b' },
+        { label: 'Depo Otomasyonu', value: 'wms' },
+        { label: 'UTS Operasyonları', value: 'uts' }
+      ],
       sending: 'Gönderiliyor...',
       send: 'Gönder',
-      success: 'Mesajınız başarıyla gönderildi!',
+      success: 'Mesajınız başarıyla destek talebine dönüştürüldü.',
+      ticketLabel: 'Takip numarası',
       error: 'Mesaj gönderilirken bir hata oluştu.',
       feedbackTitle: 'Müşteri Geri Bildirimi',
       feedbackDescription: 'Deneyiminizi puanlayın ve kısa yorum bırakın.',
@@ -73,10 +82,16 @@ export default function Contact({ language, theme }: Props) {
         message: 'Write your project details'
       },
       selectDefault: 'Select',
-      options: ['CRM System', 'B2B Platform', 'Warehouse Automation'],
+      options: [
+        { label: 'CRM System', value: 'crm' },
+        { label: 'B2B Platform', value: 'b2b' },
+        { label: 'Warehouse Automation', value: 'wms' },
+        { label: 'UTS Operations', value: 'uts' }
+      ],
       sending: 'Sending...',
       send: 'Send',
-      success: 'Your message has been sent successfully!',
+      success: 'Your message has been converted into a support request.',
+      ticketLabel: 'Ticket number',
       error: 'An error occurred while sending your message.',
       feedbackTitle: 'Customer Feedback',
       feedbackDescription: 'Rate your experience and leave a short comment.',
@@ -95,25 +110,20 @@ export default function Contact({ language, theme }: Props) {
     e.preventDefault()
     setIsSubmitting(true)
     setSubmitStatus('idle')
+    setTicketNo(undefined)
 
     try {
-      const response = await fetch('http://localhost:3001/api/contact', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(formData)
+      const result = await sendWebsiteContactRequest({
+        product: (formData.product || 'crm') as SupportProductKey,
+        name: formData.name,
+        email: formData.email,
+        message: formData.message,
+        language
       })
 
-      const result = await response.json()
-
-      if (response.ok && result.success) {
-        setSubmitStatus('success')
-        setFormData({ name: '', email: '', product: '', message: '' })
-      } else {
-        setSubmitStatus('error')
-      }
+      setSubmitStatus('success')
+      setTicketNo(result.ticketNo)
+      setFormData({ name: '', email: '', product: '', message: '' })
     } catch {
       setSubmitStatus('error')
     } finally {
@@ -231,6 +241,7 @@ export default function Contact({ language, theme }: Props) {
                       value={formData.message}
                       onChange={handleInputChange}
                       rows={5}
+                      required
                       className={`w-full border rounded-xl px-4 py-3 focus:border-cyan-400 focus:shadow-[0_0_15px_rgba(34,211,238,0.4)] focus:outline-none transition-all duration-300 ${
                         isLight ? 'bg-white/80 border-cyan-500/25 text-slate-900 placeholder-slate-400' : 'bg-slate-900/70 border-purple-500/25 text-white placeholder-gray-500'
                       }`}
@@ -250,7 +261,7 @@ export default function Contact({ language, theme }: Props) {
                         }`}
                       >
                         <span className={formData.product ? '' : (isLight ? 'text-slate-400' : 'text-gray-500')}>
-                          {formData.product || text.selectDefault}
+                          {text.options.find((option) => option.value === formData.product)?.label || text.selectDefault}
                         </span>
                         <ChevronDown className={`w-5 h-5 transition-transform duration-300 ${isProductMenuOpen ? 'rotate-180 text-cyan-400' : 'text-gray-400'}`} />
                       </button>
@@ -267,16 +278,16 @@ export default function Contact({ language, theme }: Props) {
                           >
                             {text.options.map((option, idx) => (
                               <button
-                                key={option}
+                                key={option.value}
                                 type="button"
-                                onClick={() => { setFormData(prev => ({ ...prev, product: option })); setIsProductMenuOpen(false); }}
+                                onClick={() => { setFormData(prev => ({ ...prev, product: option.value })); setIsProductMenuOpen(false); }}
                                 className={`w-full text-left px-4 py-3 text-sm transition-colors ${idx !== 0 ? 'border-t border-white/5' : ''} ${
-                                  formData.product === option 
+                                  formData.product === option.value
                                     ? (isLight ? 'bg-cyan-100 text-cyan-800 font-bold' : 'bg-cyan-500/30 text-cyan-300 font-bold') 
                                     : (isLight ? 'hover:bg-cyan-50 text-slate-700' : 'hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-400')
                                 }`}
                               >
-                                {option}
+                                {option.label}
                               </button>
                             ))}
                           </motion.div>
@@ -286,6 +297,8 @@ export default function Contact({ language, theme }: Props) {
                   ) : (
                     <input
                       name={field}
+                      type={field === 'email' ? 'email' : 'text'}
+                      required
                       autoComplete="new-password"
                       value={formData[field]}
                       onChange={handleInputChange}
@@ -311,9 +324,10 @@ export default function Contact({ language, theme }: Props) {
 
               {/* NEON SUCCESS/ERROR MESSAGES */}
               {submitStatus === 'success' && (
-                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-cyan-400 font-bold drop-shadow-[0_0_10px_rgba(34,211,238,0.8)] flex items-center gap-2">
+                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-cyan-400 font-bold drop-shadow-[0_0_10px_rgba(34,211,238,0.8)] flex flex-wrap items-center gap-2">
                   <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,211,238,1)]" />
                   {text.success}
+                  {ticketNo && <span className="rounded-full border border-cyan-400/40 px-3 py-1 text-xs">{text.ticketLabel}: {ticketNo}</span>}
                 </motion.p>
               )}
               {submitStatus === 'error' && (
