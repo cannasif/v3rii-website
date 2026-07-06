@@ -36,7 +36,7 @@ export default function ScrollToTopButton({ language, theme }: Props) {
           onClick={scrollTop}
           aria-label={label}
           title={label}
-          className={`fixed bottom-6 right-5 sm:bottom-8 sm:right-8 z-[90] rounded-full border px-3 py-3 backdrop-blur-xl transition-all duration-300 ${
+          className={`fixed bottom-24 right-5 z-[96] rounded-full border px-3 py-3 backdrop-blur-xl transition-all duration-300 sm:bottom-28 sm:right-8 ${
             isLight
               ? 'bg-white/80 text-fuchsia-700 border-fuchsia-400/60 shadow-[0_0_18px_rgba(217,70,239,0.4)] hover:shadow-[0_0_28px_rgba(34,211,238,0.55)]'
               : 'bg-slate-900/75 text-cyan-300 border-cyan-400/45 shadow-[0_0_18px_rgba(34,211,238,0.35)] hover:shadow-[0_0_28px_rgba(236,72,153,0.45)]'
