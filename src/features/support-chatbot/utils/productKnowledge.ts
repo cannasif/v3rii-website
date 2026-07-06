@@ -25,12 +25,42 @@ export const productKnowledge: Record<SupportLanguage, Record<SupportProductKey,
       ],
       integrations: ['ERP cari/stok referansları', 'Outlook ve mail ayarları', 'WhatsApp entegrasyonu', 'Power BI', 'Hangfire izleme'],
       parameters: [
-        'Netsis/ERP cari ve stok eşleme kuralları',
+        'ERP cari ve stok eşleme kuralları',
         'Belge seri, teklif/sipariş ve onay akışı tanımları',
         'Kullanıcı, rol, grup ve indirim limitleri',
         'Müşteri tipi, temsilci, bölge ve fiyat kural parametreleri'
       ],
       supportTopics: ['Kullanıcı yetkileri', 'Teklif/sipariş akışı', 'Raporlar', 'ERP entegrasyonu', 'Mail ayarları']
+    },
+    aqua: {
+      key: 'aqua',
+      title: 'V3RII AQUA',
+      shortTitle: 'AQUA',
+      summary:
+        'Açık deniz ve kafes bazlı balık yetiştiriciliği (aquakültür) operasyonlarını uçtan uca yöneten, ERP entegre üretim ve karar destek platformudur.',
+      idealFor: 'Aquakültür işletmeleri, kafes bazlı üretim yapan tesisler, hasat ve stok planlaması yapan üretim ekipleri.',
+      features: [
+        'Kafes, batch ve depo bazlı canlı stok takibi',
+        'Günlük giriş: yemleme, fire, hava durumu, transfer, sevkiyat',
+        'Yapay zeka destekli FCR, KPI ve hasat tahmini',
+        'ERP aktarımı ve postlama kilidi',
+        'Excel ile toplu ilk geçiş (opening import)'
+      ],
+      modules: [
+        'Hızlı kurulum ve ilk geçiş ekranları',
+        'Günlük giriş, mal kabul, yemleme ve fire',
+        'Kafes/depo transferleri, sevkiyat, tartım ve stok dönüşümü',
+        'Balık partileri, hava durumu, ağ işlemleri ve proje birleştirme',
+        'Canlı gösterge paneli ve KPI raporları'
+      ],
+      integrations: ['ERP aktarımı ve mirror senkronizasyonu', 'Kafes–ERP depo eşleştirmesi', 'Excel/PDF/PowerPoint dışa aktarım', 'Hangfire arka plan işleri', 'Sensör verileri'],
+      parameters: [
+        'Proje, kafes ve kafes–depo eşleştirme tanımları',
+        'Belge durumları: taslak, post, iptal',
+        'Rol bazlı erişim ve izin grupları',
+        'Hava tipleri, risk skorları ve KPI eşikleri'
+      ],
+      supportTopics: ['Günlük giriş', 'Transfer kuralları', 'FCR/KPI raporları', 'ERP aktarımı', 'İlk geçiş']
     },
     b2b: {
       key: 'b2b',
@@ -55,7 +85,7 @@ export const productKnowledge: Record<SupportLanguage, Record<SupportProductKey,
       ],
       integrations: ['ERP cari/stok/depo referansları', 'Pazar yeri bağlantıları', 'Ödeme bağlantıları', 'SMTP mail ayarları', 'Trace explorer'],
       parameters: [
-        'Netsis/ERP cari, stok, depo ve yap-kod referans parametreleri',
+        'ERP cari, stok, depo ve yap-kod referans parametreleri',
         'Müşteri bazlı katalog görünürlük ve fiyat kuralları',
         'Stok görünürlüğü, ödeme bağlantısı ve pazar yeri kanal ayarları',
         'B2B kapsam politikaları, kullanıcı atamaları ve satın alma onay kuralları'
@@ -85,7 +115,7 @@ export const productKnowledge: Record<SupportLanguage, Record<SupportProductKey,
       ],
       integrations: ['ERP stok/depo/cari referansları', 'eLogo e-Fatura/e-Arşiv', 'Barkod etiket altyapısı', 'Hangfire izleme', 'Mail ayarları'],
       parameters: [
-        'Netsis/ERP stok, depo, cari ve hareket referans parametreleri',
+        'ERP stok, depo, cari ve hareket referans parametreleri',
         'Depo, raf, lokasyon ve işlem tipi ayarları',
         'Kalite kural tanımları, karantina akışı ve kontrol parametreleri',
         'Barkod şablonları, belge serileri, KKD hak matrisi ve servis atama kuralları'
@@ -115,7 +145,7 @@ export const productKnowledge: Record<SupportLanguage, Record<SupportProductKey,
       ],
       integrations: ['UTS/ÜTS operasyon kayıtları', 'Cari ve stok referansları', 'Hangfire izleme', 'Yetki altyapısı'],
       parameters: [
-        'Netsis/ERP cari ve stok referans eşlemeleri',
+        'ERP cari ve stok referans eşlemeleri',
         'UTS işlem türüne göre liste ve durum takipleri',
         'Kullanıcı, rol ve izin grubu tanımları',
         'Yetki bazlı operasyon görünürlüğü'
@@ -147,12 +177,42 @@ export const productKnowledge: Record<SupportLanguage, Record<SupportProductKey,
       ],
       integrations: ['ERP customer/stock references', 'Outlook and mail settings', 'WhatsApp integration', 'Power BI', 'Hangfire monitoring'],
       parameters: [
-        'Netsis/ERP customer and stock matching rules',
+        'ERP customer and stock matching rules',
         'Document serial, quote/order and approval flow definitions',
         'Users, roles, groups and discount limits',
         'Customer type, representative, region and pricing rule parameters'
       ],
       supportTopics: ['User permissions', 'Quote/order flow', 'Reports', 'ERP integration', 'Mail settings']
+    },
+    aqua: {
+      key: 'aqua',
+      title: 'V3RII AQUA',
+      shortTitle: 'AQUA',
+      summary:
+        'An ERP-integrated production and decision support platform managing offshore cage-based aquaculture operations end to end.',
+      idealFor: 'Aquaculture companies, cage-based production facilities and production teams planning harvest and stock.',
+      features: [
+        'Live stock tracking by cage, batch and warehouse',
+        'Daily entry: feeding, mortality, weather, transfer, shipment',
+        'AI-powered FCR, KPI and harvest forecasting',
+        'ERP transfer and posting lock',
+        'Bulk opening import via Excel'
+      ],
+      modules: [
+        'Quick setup and opening import screens',
+        'Daily entry, goods receipt, feeding and mortality',
+        'Cage/warehouse transfers, shipment, weighing and stock conversion',
+        'Fish batches, weather, net operations and project merge',
+        'Live dashboard and KPI reports'
+      ],
+      integrations: ['ERP transfer and mirror sync', 'Cage–ERP warehouse mapping', 'Excel/PDF/PowerPoint export', 'Hangfire background jobs', 'Sensor data'],
+      parameters: [
+        'Project, cage and cage–warehouse mapping definitions',
+        'Document states: draft, posted, cancelled',
+        'Role-based access and permission groups',
+        'Weather types, risk scores and KPI thresholds'
+      ],
+      supportTopics: ['Daily entry', 'Transfer rules', 'FCR/KPI reports', 'ERP transfer', 'Opening import']
     },
     b2b: {
       key: 'b2b',
@@ -177,7 +237,7 @@ export const productKnowledge: Record<SupportLanguage, Record<SupportProductKey,
       ],
       integrations: ['ERP customer/stock/warehouse references', 'Marketplace connections', 'Payment integrations', 'SMTP mail settings', 'Trace explorer'],
       parameters: [
-        'Netsis/ERP customer, stock, warehouse and custom-code reference parameters',
+        'ERP customer, stock, warehouse and custom-code reference parameters',
         'Customer-based catalog visibility and pricing rules',
         'Inventory visibility, payment connection and marketplace channel settings',
         'B2B scope policies, user assignments and purchase approval rules'
@@ -207,7 +267,7 @@ export const productKnowledge: Record<SupportLanguage, Record<SupportProductKey,
       ],
       integrations: ['ERP stock/warehouse/customer references', 'eLogo e-Invoice/e-Archive', 'Barcode label infrastructure', 'Hangfire monitoring', 'Mail settings'],
       parameters: [
-        'Netsis/ERP stock, warehouse, customer and transaction reference parameters',
+        'ERP stock, warehouse, customer and transaction reference parameters',
         'Warehouse, shelf, location and operation type settings',
         'Quality rule definitions, quarantine flow and control parameters',
         'Barcode templates, document serials, PPE entitlement matrix and service allocation rules'
@@ -237,7 +297,7 @@ export const productKnowledge: Record<SupportLanguage, Record<SupportProductKey,
       ],
       integrations: ['UTS operation records', 'Customer and stock references', 'Hangfire monitoring', 'Permission infrastructure'],
       parameters: [
-        'Netsis/ERP customer and stock reference matching',
+        'ERP customer and stock reference matching',
         'List and status tracking by UTS operation type',
         'User, role and permission group definitions',
         'Permission-based operation visibility'
@@ -247,11 +307,12 @@ export const productKnowledge: Record<SupportLanguage, Record<SupportProductKey,
   }
 }
 
-export const productKeys: SupportProductKey[] = ['crm', 'b2b', 'wms', 'uts']
+export const productKeys: SupportProductKey[] = ['crm', 'aqua', 'b2b', 'wms', 'uts']
 
 export const getProductByKeyword = (value: string): SupportProductKey | null => {
   const normalized = value.toLocaleLowerCase('tr-TR')
   if (normalized.includes('crm')) return 'crm'
+  if (normalized.includes('aqua') || normalized.includes('balık') || normalized.includes('kafes') || normalized.includes('aquakültür')) return 'aqua'
   if (normalized.includes('b2b') || normalized.includes('bayi') || normalized.includes('portal')) return 'b2b'
   if (normalized.includes('wms') || normalized.includes('depo') || normalized.includes('warehouse')) return 'wms'
   if (normalized.includes('uts') || normalized.includes('üts') || normalized.includes('ürün takip')) return 'uts'

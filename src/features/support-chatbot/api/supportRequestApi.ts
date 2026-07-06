@@ -4,6 +4,7 @@ const API_BASE_URL = import.meta.env.VITE_V3RII_API_BASE_URL || import.meta.env.
 
 const productMap: Record<SupportProductKey, KnowledgeArticle['product']> = {
   crm: 'Crm',
+  aqua: 'Aqua',
   b2b: 'B2B',
   wms: 'Wms',
   uts: 'Uts'

@@ -1,6 +1,6 @@
 export type SupportLanguage = 'tr' | 'en'
 
-export type SupportProductKey = 'crm' | 'b2b' | 'wms' | 'uts'
+export type SupportProductKey = 'crm' | 'aqua' | 'b2b' | 'wms' | 'uts'
 
 export type SupportIntent = 'product-info' | 'demo' | 'technical-support' | 'integration' | 'pricing'
 
@@ -67,7 +67,7 @@ export type SupportRequestResult = {
 
 export type KnowledgeArticle = {
   id: number
-  product: 'Crm' | 'B2B' | 'Wms' | 'Uts'
+  product: 'Crm' | 'Aqua' | 'B2B' | 'Wms' | 'Uts'
   title: string
   summary: string
   contentMarkdown: string

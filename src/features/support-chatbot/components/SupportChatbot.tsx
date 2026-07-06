@@ -4,9 +4,9 @@ import {
   Bot,
   Building2,
   CheckCircle2,
+  ChevronDown,
   Headphones,
   Mail,
-  MessageCircle,
   Minimize2,
   PackageCheck,
   Send,
@@ -166,6 +166,8 @@ const savePendingRequest = (lead: SupportLead, messages: ChatMessage[]) => {
 export default function SupportChatbot({ language, theme }: Props) {
   const initialLanguage: SupportLanguage = language === 'en' ? 'en' : 'tr'
   const [isOpen, setIsOpen] = useState(false)
+  const [productModalOpen, setProductModalOpen] = useState(false)
+  const [headerExpanded, setHeaderExpanded] = useState(false)
   const [step, setStep] = useState<SupportStep>('product')
   const [lead, setLead] = useState<SupportLead>(() => initialLead(initialLanguage))
   const [messages, setMessages] = useState<ChatMessage[]>(() => createInitialMessages(initialLanguage))
@@ -179,6 +181,20 @@ export default function SupportChatbot({ language, theme }: Props) {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages, isOpen])
+
+  // Diğer bileşenler (ör. Yukarı Çık butonu) chatbot durumunu bilsin
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('v3rii-chat-toggle', { detail: { open: isOpen } }))
+  }, [isOpen])
+
+  // Ürün modalı açıkken chatbot tamamen gizlenir
+  useEffect(() => {
+    const onModalToggle = (event: Event) => {
+      setProductModalOpen(Boolean((event as CustomEvent<{ open: boolean }>).detail?.open))
+    }
+    window.addEventListener('v3rii-product-modal-toggle', onModalToggle)
+    return () => window.removeEventListener('v3rii-product-modal-toggle', onModalToggle)
+  }, [])
 
   useEffect(() => {
     void trackChatEvent('chat_started', { sessionId: sessionIdRef.current, metadata: { language: initialLanguage } })
@@ -432,75 +448,138 @@ export default function SupportChatbot({ language, theme }: Props) {
     submitMessage(action.value)
   }
 
+  const PANEL_CLIP = 'polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px)'
+  const CHIP_CLIP = 'polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px)'
+  const LAUNCHER_CLIP = 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)'
+
+  if (productModalOpen) return null
+
   return (
-    <div className="fixed bottom-5 left-4 right-4 z-[95] flex justify-end pointer-events-none sm:bottom-7 sm:right-7 sm:left-auto">
+    <div
+      className="fixed left-3 right-3 z-[95] flex justify-end pointer-events-none sm:right-7 sm:left-auto"
+      style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
+    >
       <AnimatePresence>
         {isOpen && (
+          <motion.div
+            key="chat-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setIsOpen(false)}
+            className={`pointer-events-auto fixed inset-0 backdrop-blur-[3px] sm:hidden ${isLight ? 'bg-white/30' : 'bg-black/50'}`}
+          />
+        )}
+        {isOpen && (
           <motion.aside
+            key="chat-panel"
             initial={{ opacity: 0, y: 24, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 18, scale: 0.98 }}
             transition={{ duration: 0.22 }}
-            className={`pointer-events-auto mb-4 flex h-[min(680px,calc(100vh-112px))] w-full max-w-[430px] flex-col overflow-hidden rounded-2xl border backdrop-blur-2xl ${
+            style={{ clipPath: PANEL_CLIP }}
+            className={`pointer-events-auto mb-3 flex h-[min(680px,calc(100dvh-120px))] w-full max-w-[430px] flex-col overflow-hidden border backdrop-blur-2xl ${
               isLight
-                ? 'border-cyan-300/70 bg-white/92 text-slate-950 shadow-[0_24px_70px_rgba(14,116,144,0.28)]'
-                : 'border-cyan-400/35 bg-slate-950/88 text-white shadow-[0_24px_80px_rgba(8,47,73,0.55)]'
+                ? 'border-pink-400/50 bg-white/94 text-slate-950 shadow-[0_24px_70px_rgba(219,39,119,0.22)]'
+                : 'border-pink-500/35 bg-[#060910]/94 text-white shadow-[0_24px_80px_rgba(219,39,119,0.28)]'
             }`}
           >
-            <div className={`border-b p-4 ${isLight ? 'border-cyan-200/70' : 'border-cyan-400/20'}`}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl border ${isLight ? 'border-cyan-300 bg-cyan-50 text-cyan-700' : 'border-cyan-400/40 bg-cyan-400/10 text-cyan-200'}`}>
-                    <Bot className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <h2 className="truncate text-base font-bold">{t.title}</h2>
-                    <p className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{t.subtitle}</p>
-                  </div>
+            {/* Tarama çizgisi dokusu */}
+            <div
+              className="pointer-events-none absolute inset-0 z-0 opacity-[0.14]"
+              style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(34,211,238,0.25) 3px, rgba(34,211,238,0.25) 4px)' }}
+            />
+
+            {/* Terminal başlık çubuğu */}
+            <div className={`relative z-10 border-b ${isLight ? 'border-pink-300/40 bg-pink-50/70' : 'border-pink-500/25 bg-black/50'}`}>
+              <div className="flex items-center justify-between gap-2 px-4 pt-3">
+                <div className="flex items-center gap-2 font-cyber text-[10px] uppercase tracking-[0.25em] text-pink-500">
+                  <span className="text-cyan-400">&gt;_</span>
+                  V3RII_BOT.EXE
                 </div>
                 <div className="flex items-center gap-1">
-                  <button onClick={() => reset()} className={`rounded-lg p-2 ${isLight ? 'hover:bg-slate-100' : 'hover:bg-white/10'}`} title={t.reset}>
+                  {/* Sadece mobil: başlık bilgi bloğunu aç/kapa */}
+                  <button
+                    onClick={() => setHeaderExpanded((prev) => !prev)}
+                    className={`p-1.5 text-cyan-400 transition hover:text-pink-400 sm:hidden ${isLight ? 'hover:bg-pink-100' : 'hover:bg-white/10'}`}
+                    aria-expanded={headerExpanded}
+                    aria-label="Bilgi panelini aç/kapat"
+                  >
+                    <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${headerExpanded ? 'rotate-180' : ''}`} />
+                  </button>
+                  <button onClick={() => reset()} className={`p-1.5 text-cyan-400 transition hover:text-pink-400 ${isLight ? 'hover:bg-pink-100' : 'hover:bg-white/10'}`} title={t.reset}>
                     <PackageCheck className="h-4 w-4" />
                   </button>
-                  <button onClick={() => setIsOpen(false)} className={`rounded-lg p-2 ${isLight ? 'hover:bg-slate-100' : 'hover:bg-white/10'}`} title={t.minimize}>
+                  <button onClick={() => setIsOpen(false)} className={`p-1.5 text-cyan-400 transition hover:text-pink-400 ${isLight ? 'hover:bg-pink-100' : 'hover:bg-white/10'}`} title={t.minimize}>
                     <Minimize2 className="h-4 w-4" />
                   </button>
-                  <button onClick={() => setIsOpen(false)} className={`rounded-lg p-2 ${isLight ? 'hover:bg-slate-100' : 'hover:bg-white/10'}`} title={t.close}>
+                  <button onClick={() => setIsOpen(false)} className={`p-1.5 text-pink-500 transition hover:text-white ${isLight ? 'hover:bg-pink-500' : 'hover:bg-pink-500'}`} title={t.close}>
                     <X className="h-4 w-4" />
                   </button>
                 </div>
               </div>
 
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${isLight ? 'border-cyan-200 text-slate-600' : 'border-white/10 text-slate-300'}`}>
-                  <Building2 className="h-3.5 w-3.5" />
+              <div className={`${headerExpanded ? 'block' : 'hidden'} sm:block`}>
+              <div className="flex items-start gap-3 px-4 pb-3 pt-2">
+                <div
+                  style={{ clipPath: CHIP_CLIP }}
+                  className={`relative grid h-11 w-11 shrink-0 place-items-center border ${
+                    isLight ? 'border-cyan-400/60 bg-cyan-50 text-cyan-700' : 'border-cyan-400/40 bg-cyan-400/10 text-cyan-300'
+                  }`}
+                >
+                  <Bot className="h-6 w-6" style={{ animation: 'cyberBotEyeBlink 4s infinite' }} />
+                </div>
+                <div className="min-w-0">
+                  <h2 className={`truncate font-cyber text-sm font-bold uppercase tracking-wider ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                    {t.title}
+                  </h2>
+                  <p className={`mt-0.5 text-[11px] leading-snug ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{t.subtitle}</p>
+                  <div className="mt-1.5 flex items-center gap-1.5 font-cyber text-[9px] uppercase tracking-[0.22em] text-emerald-400">
+                    <span className="h-1.5 w-1.5 animate-pulse bg-emerald-400" />
+                    ONLINE
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 px-4 pb-3 text-[10px]">
+                <span style={{ clipPath: CHIP_CLIP }} className={`inline-flex items-center gap-1 border px-2.5 py-1 font-cyber uppercase tracking-wider ${isLight ? 'border-cyan-300/60 bg-cyan-50 text-slate-600' : 'border-cyan-400/25 bg-cyan-400/5 text-cyan-200'}`}>
+                  <Building2 className="h-3 w-3" />
                   CRM / B2B / WMS / UTS
                 </span>
-                <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${isLight ? 'border-fuchsia-200 text-fuchsia-700' : 'border-fuchsia-400/30 text-fuchsia-200'}`}>
-                  <Mail className="h-3.5 w-3.5" />
+                <span style={{ clipPath: CHIP_CLIP }} className={`inline-flex items-center gap-1 border px-2.5 py-1 font-cyber uppercase tracking-wider ${isLight ? 'border-pink-300/60 bg-pink-50 text-pink-700' : 'border-pink-500/30 bg-pink-500/5 text-pink-300'}`}>
+                  <Mail className="h-3 w-3" />
                   Support mail
                 </span>
               </div>
+              </div>
             </div>
 
-            <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+            {/* Mesaj akışı */}
+            <div ref={scrollRef} className="custom-scrollbar relative z-10 min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
               {messages.map((message) => (
                 <div key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div
-                    className={`max-w-[86%] whitespace-pre-line rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
+                    style={{ clipPath: CHIP_CLIP }}
+                    className={`max-w-[88%] whitespace-pre-line px-3.5 py-2.5 text-sm leading-relaxed ${
                       message.sender === 'user'
-                        ? 'bg-gradient-to-r from-cyan-500 to-fuchsia-500 text-white'
+                        ? 'bg-gradient-to-r from-pink-600 via-orange-500 to-amber-400 text-white shadow-[0_0_16px_rgba(219,39,119,0.25)]'
                         : message.sender === 'system'
                           ? isLight
-                            ? 'border border-emerald-200 bg-emerald-50 text-emerald-800'
-                            : 'border border-emerald-400/30 bg-emerald-400/10 text-emerald-200'
+                            ? 'border border-emerald-300 bg-emerald-50 text-emerald-800'
+                            : 'border border-emerald-400/30 bg-emerald-400/[0.07] text-emerald-200'
                           : isLight
-                            ? 'border border-slate-200 bg-slate-50 text-slate-800'
-                            : 'border border-white/10 bg-white/[0.06] text-slate-100'
+                            ? 'border border-pink-200 border-l-2 border-l-pink-500 bg-white/85 text-slate-800'
+                            : 'border border-white/10 border-l-2 border-l-pink-500 bg-white/[0.05] text-slate-100'
                     }`}
                   >
+                    {message.sender === 'bot' && (
+                      <div className="mb-1 font-cyber text-[9px] uppercase tracking-[0.22em] text-cyan-400">
+                        V3RII_BOT &gt;
+                      </div>
+                    )}
                     {message.sender === 'system' && (
-                      <div className="mb-1 flex items-center gap-1 text-xs font-bold">
+                      <div className="mb-1 flex items-center gap-1 font-cyber text-[10px] uppercase tracking-wider">
                         {message.meta === 'pending' ? <AlertCircle className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
                         {message.meta}
                       </div>
@@ -511,12 +590,13 @@ export default function SupportChatbot({ language, theme }: Props) {
                         {message.cards.map((card) => (
                           <details
                             key={`${message.id}-${card.title}`}
-                            className={`group rounded-xl border px-3 py-2 ${
-                              isLight ? 'border-cyan-100 bg-white/80' : 'border-cyan-400/15 bg-slate-950/45'
+                            style={{ clipPath: CHIP_CLIP }}
+                            className={`group border px-3 py-2 ${
+                              isLight ? 'border-cyan-200 bg-white/85' : 'border-cyan-400/15 bg-black/45'
                             }`}
                           >
-                            <summary className="cursor-pointer list-none text-xs font-bold uppercase tracking-wide text-cyan-500">
-                              {card.title}
+                            <summary className="cursor-pointer list-none font-cyber text-[10px] font-bold uppercase tracking-wider text-cyan-400 transition hover:text-pink-400">
+                              ▸ {card.title}
                             </summary>
                             <p className={`mt-2 whitespace-pre-line text-xs leading-relaxed ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
                               {card.body}
@@ -530,17 +610,19 @@ export default function SupportChatbot({ language, theme }: Props) {
               ))}
             </div>
 
-            <div className={`border-t p-3 ${isLight ? 'border-cyan-200/70' : 'border-cyan-400/20'}`}>
+            {/* Giriş alanı */}
+            <div className={`relative z-10 border-t p-3 ${isLight ? 'border-pink-300/40 bg-pink-50/50' : 'border-pink-500/25 bg-black/45'}`}>
               {quickActions.length > 0 && (
-                <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+                <div className="custom-scrollbar mb-3 flex gap-2 overflow-x-auto pb-1">
                   {quickActions.map((action) => (
                     <button
                       key={`${step}-${action.label}`}
                       onClick={() => handleQuickAction(action)}
-                      className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                      style={{ clipPath: CHIP_CLIP }}
+                      className={`shrink-0 border px-3 py-1.5 font-cyber text-[10px] font-semibold uppercase tracking-wider transition ${
                         isLight
-                          ? 'border-cyan-200 bg-cyan-50 text-cyan-800 hover:bg-cyan-100'
-                          : 'border-cyan-400/30 bg-cyan-400/10 text-cyan-200 hover:bg-cyan-400/20'
+                          ? 'border-cyan-300 bg-cyan-50 text-cyan-800 hover:border-pink-400 hover:bg-pink-50 hover:text-pink-700'
+                          : 'border-cyan-400/30 bg-cyan-400/5 text-cyan-200 hover:border-pink-500/50 hover:bg-pink-500/10 hover:text-pink-300'
                       }`}
                     >
                       {action.label}
@@ -556,29 +638,34 @@ export default function SupportChatbot({ language, theme }: Props) {
                 }}
                 className="flex items-end gap-2"
               >
-                <textarea
-                  value={input}
-                  onChange={(event) => setInput(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' && !event.shiftKey) {
-                      event.preventDefault()
-                      submitMessage(input)
-                    }
-                  }}
-                  rows={1}
-                  disabled={isSending}
-                  placeholder={isSending ? 'Gönderiliyor...' : t.input}
-                  className={`max-h-28 min-h-11 flex-1 resize-none rounded-xl border px-3 py-2.5 text-sm outline-none transition disabled:opacity-60 ${
-                    isLight
-                      ? 'border-cyan-200 bg-white text-slate-900 placeholder:text-slate-400 focus:border-cyan-400'
-                      : 'border-cyan-400/25 bg-slate-900/80 text-white placeholder:text-slate-500 focus:border-cyan-300'
-                  }`}
-                />
+                <div className="relative flex-1">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-cyber text-xs text-pink-500">&gt;</span>
+                  <textarea
+                    value={input}
+                    onChange={(event) => setInput(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' && !event.shiftKey) {
+                        event.preventDefault()
+                        submitMessage(input)
+                      }
+                    }}
+                    rows={1}
+                    disabled={isSending}
+                    placeholder={isSending ? 'Gönderiliyor...' : t.input}
+                    style={{ clipPath: CHIP_CLIP }}
+                    className={`max-h-28 min-h-11 w-full resize-none border py-2.5 pl-7 pr-3 text-sm outline-none transition disabled:opacity-60 ${
+                      isLight
+                        ? 'border-cyan-300 bg-white text-slate-900 placeholder:text-slate-400 focus:border-pink-500 focus:shadow-[0_0_14px_rgba(219,39,119,0.2)]'
+                        : 'border-cyan-400/25 bg-[#0a0f18] text-white placeholder:text-slate-500 focus:border-pink-500/60 focus:shadow-[0_0_14px_rgba(219,39,119,0.25)]'
+                    }`}
+                  />
+                </div>
                 <button
                   type="submit"
                   disabled={isSending}
                   aria-label={t.send}
-                  className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-cyan-300/50 bg-gradient-to-br from-cyan-500 to-fuchsia-500 text-white shadow-[0_0_20px_rgba(34,211,238,0.25)] transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60"
+                  style={{ clipPath: CHIP_CLIP }}
+                  className="grid h-11 w-11 shrink-0 place-items-center bg-gradient-to-br from-pink-600 via-orange-500 to-amber-400 text-white shadow-[0_0_20px_rgba(219,39,119,0.3)] transition hover:shadow-[0_0_30px_rgba(219,39,119,0.5)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Send className="h-4 w-4" />
                 </button>
@@ -588,26 +675,58 @@ export default function SupportChatbot({ language, theme }: Props) {
         )}
       </AnimatePresence>
 
-      <motion.button
-        whileHover={{ scale: 1.04, y: -2 }}
-        whileTap={{ scale: 0.96 }}
-        onClick={() => setIsOpen((prev) => !prev)}
-        aria-label={t.title}
-        className={`pointer-events-auto relative grid h-14 w-14 place-items-center rounded-full border sm:h-16 sm:w-16 ${
-          isLight
-            ? 'border-fuchsia-300 bg-white/90 text-fuchsia-700 shadow-[0_0_28px_rgba(217,70,239,0.36)]'
-            : 'border-cyan-300/55 bg-slate-950/82 text-cyan-200 shadow-[0_0_32px_rgba(34,211,238,0.35)]'
-        }`}
-      >
-        <span className="absolute -right-0.5 -top-0.5 grid h-5 w-5 place-items-center rounded-full bg-emerald-400 text-[10px] font-bold text-emerald-950">
-          AI
-        </span>
-        {isOpen ? <Headphones className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
-      </motion.button>
+      {/* Robot başlatıcı butonu (mobilde panel açıkken gizlenir, panelin kendi kapatma butonları var) */}
+      <div className={`relative shrink-0 ${isOpen ? 'hidden sm:block' : ''}`}>
+        {/* Ping halkası (butonun clip-path'i dışında kalması için sarmalayıcıda) */}
+        {!isOpen && (
+          <span
+            className="pointer-events-none absolute inset-0 border border-pink-500/60"
+            style={{ clipPath: LAUNCHER_CLIP, animation: 'cyberBotPing 2.4s ease-out infinite' }}
+          />
+        )}
+        <motion.button
+          whileHover={{ scale: 1.05, y: -2 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setIsOpen((prev) => !prev)}
+          aria-label={t.title}
+          style={{ clipPath: LAUNCHER_CLIP }}
+          className={`pointer-events-auto relative grid h-14 w-14 place-items-center border sm:h-16 sm:w-16 ${
+            isLight
+              ? 'border-pink-500/60 bg-white/92 text-pink-600 shadow-[0_0_26px_rgba(219,39,119,0.35)]'
+              : 'border-pink-500/50 bg-[#060910]/90 text-cyan-300 shadow-[0_0_30px_rgba(219,39,119,0.35)]'
+          }`}
+        >
+          {/* Tarama dokusu */}
+          <span
+            className="pointer-events-none absolute inset-0 opacity-25"
+            style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(34,211,238,0.2) 3px, rgba(34,211,238,0.2) 4px)' }}
+          />
+          {/* Köşe aksanları */}
+          <span className="pointer-events-none absolute right-0 top-0 h-2.5 w-2.5 border-r border-t border-cyan-400/80" />
+          <span className="pointer-events-none absolute bottom-0 left-0 h-2.5 w-2.5 border-b border-l border-cyan-400/80" />
+
+          <span
+            className="absolute right-0.5 top-0.5 grid h-5 w-6 place-items-center bg-gradient-to-r from-pink-600 to-orange-500 font-cyber text-[8px] font-bold text-white"
+            style={{ clipPath: 'polygon(3px 0, 100% 0, 100% 100%, 0 100%, 0 3px)' }}
+          >
+            AI
+          </span>
+          {isOpen ? (
+            <Headphones className="relative h-6 w-6" />
+          ) : (
+            <Bot className="relative h-7 w-7" style={{ animation: 'cyberBotEyeBlink 4s infinite' }} />
+          )}
+        </motion.button>
+      </div>
 
       {!isOpen && (
-        <div className={`pointer-events-none absolute bottom-1 right-16 hidden max-w-[220px] rounded-xl border px-3 py-2 text-xs font-semibold backdrop-blur-xl sm:block ${isLight ? 'border-cyan-200 bg-white/86 text-slate-700' : 'border-cyan-400/25 bg-slate-950/78 text-cyan-100'}`}>
-          {t.closedHint}
+        <div
+          style={{ clipPath: CHIP_CLIP }}
+          className={`pointer-events-none absolute bottom-1 right-[4.5rem] hidden max-w-[230px] border px-3 py-2 font-cyber text-[10px] uppercase tracking-wider backdrop-blur-xl sm:right-20 sm:block ${
+            isLight ? 'border-pink-300/60 bg-white/88 text-slate-700' : 'border-pink-500/30 bg-[#060910]/85 text-cyan-200'
+          }`}
+        >
+          <span className="text-pink-500">&gt;_</span> {t.closedHint}
         </div>
       )}
     </div>
