@@ -1,17 +1,19 @@
-import { Users, Package, Droplets } from 'lucide-react'
+import { Building2, Factory, Package, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 // CRM Assets
+import crmLogo from '../assets/veriicrmlogo.png'
 import crm1 from '../assets/crm_1.png'
 import crm2 from '../assets/crm_2.png'
 import crm3 from '../assets/crm_3.png'
 import crm4 from '../assets/crm_4.png'
 
-// AQUA Assets
-import aqua1 from '../assets/aqua_1.png'
-import aqua2 from '../assets/aqua_2.png'
-import aqua3 from '../assets/aqua_3.png'
-import aqua4 from '../assets/aqua_4.png'
+import b2bLogo from '../assets/b2b.png'
+import wmsLogo from '../assets/v3riiwms.png'
+import utsLogo from '../assets/v3logo.png'
+import b2bPreview from '../assets/b2b.png'
+import wmsPreview from '../assets/wms.png'
+import crmPreview from '../assets/crm.png'
 
 export type LocalizedText = {
   tr: string
@@ -20,6 +22,7 @@ export type LocalizedText = {
 
 export type ProductItem = {
   icon: LucideIcon
+  logo?: string
   title: LocalizedText
   description: LocalizedText
   features: {
@@ -33,55 +36,74 @@ export type ProductItem = {
 export const products: ProductItem[] = [
   {
     icon: Users,
+    logo: crmLogo,
     title: {
-      tr: 'CRM Sistemi',
-      en: 'CRM System'
+      tr: 'V3RII CRM',
+      en: 'V3RII CRM'
     },
     description: {
-      tr: 'Müşteri ilişkilerini yönetmek için gelişmiş AI destekli CRM çözümü. Satış süreçlerinizi otomatikleştirin ve müşteri memnuniyetini artırın.',
-      en: 'Advanced AI-powered CRM solution to manage customer relationships. Automate your sales operations and improve customer satisfaction.'
+      tr: 'Müşteri, teklif, sipariş, onay, aktivite, raporlama ve entegrasyon süreçlerini tek panelde toplayan kurumsal satış operasyon platformu.',
+      en: 'An enterprise sales operations platform combining customers, quotes, orders, approvals, activities, reporting and integrations in one panel.'
     },
     features: {
-      tr: ['AI Destekli Analiz', 'Otomatik Raporlama', 'Mobil Uyumluluk', "Entegrasyon API'leri"],
-      en: ['AI Assisted Analytics', 'Automated Reporting', 'Mobile Compatibility', 'Integration APIs']
+      tr: ['Müşteri 360 ve mükerrer kayıt kontrolü', 'Teklif, sipariş ve onay akışları', 'PDF rapor tasarım ve Power BI', 'Mail, Outlook, WhatsApp ve ERP entegrasyonu'],
+      en: ['Customer 360 and dedupe control', 'Quote, order and approval flows', 'PDF report designer and Power BI', 'Mail, Outlook, WhatsApp and ERP integrations']
     },
-    gallery: [crm1, crm2, crm3, crm4],
-    link: "https://crm.v3rii.com" // CRM SİTESİ LİNKİNİ BURAYA YAZ (Örnek)
+    gallery: [crm1, crm2, crm3, crm4, crmPreview],
+    link: 'https://crm.v3rii.com'
   },
   {
-    icon: Droplets, 
+    icon: Building2,
+    logo: b2bLogo,
     title: {
-      tr: 'AQUA Platform',
-      en: 'AQUA Platform'
+      tr: 'V3RII B2B',
+      en: 'V3RII B2B'
     },
     description: {
-      tr: 'Gelişmiş veri analitiği ve takip sistemi. İşletmenizin dijital ekosistemini su kadar berrak ve akıcı bir şekilde yönetin.',
-      en: 'Advanced analytics and monitoring platform. Manage your business digital ecosystem with clarity and fluid control.'
+      tr: 'Bayi ve müşteri portalları için katalog, fiyat, stok görünürlüğü, teklif, sipariş, ödeme ve pazar yeri entegrasyonlarını yöneten B2B çözümü.',
+      en: 'A B2B solution for dealer and customer portals, managing catalog, pricing, inventory visibility, quotes, orders, payments and marketplaces.'
     },
     features: {
-      tr: ['Gerçek Zamanlı Takip', 'Veri Görselleştirme', 'Akıllı Bildirimler', 'Hiyerarşik Yönetim'],
-      en: ['Real-Time Tracking', 'Data Visualization', 'Smart Alerts', 'Hierarchical Management']
+      tr: ['Şirket hesapları ve alıcı yönetimi', 'Katalog, fiyat ve stok görünürlüğü', 'Teklif, sipariş ve ödeme operasyonları', 'Pazar yeri, ERP ve kapsam politikaları'],
+      en: ['Company accounts and buyer management', 'Catalog, pricing and inventory visibility', 'Quote, order and payment operations', 'Marketplace, ERP and scope policies']
     },
-    gallery: [aqua1, aqua2, aqua3, aqua4],
-    link: "https://aqua.v3rii.com" // AQUA SİTESİ LİNKİNİ BURAYA YAZ (Örnek)
+    gallery: [b2bPreview],
+    link: 'https://b2b.v3rii.com'
   },
   {
     icon: Package,
+    logo: wmsLogo,
     title: {
-      tr: 'Depo Otomasyonu',
-      en: 'Warehouse Automation'
+      tr: 'V3RII WMS',
+      en: 'V3RII WMS'
     },
     description: {
-      tr: 'Akıllı depo yönetim sistemi ile stok kontrolü ve lojistik süreçlerinizi optimize edin. IoT sensörleri ile tam kontrol.',
-      en: 'Optimize inventory control and logistics processes with our smart warehouse management system. Full visibility with IoT sensors.'
+      tr: 'Mal kabulden kalite kontrol ve karantinaya, transferden sevkiyat ve paketlemeye kadar depo operasyonlarını uçtan uca yöneten WMS uygulaması.',
+      en: 'An end-to-end WMS for warehouse operations from goods receipt, quality and quarantine to transfers, shipment and packing.'
     },
     features: {
-      tr: ['IoT Entegrasyonu', 'Stok Optimizasyonu', 'Robotik Destek', 'Predictive Analytics'],
-      en: ['IoT Integration', 'Stock Optimization', 'Robotic Support', 'Predictive Analytics']
+      tr: ['Mal kabul, depo giriş/çıkış ve transfer', 'Kalite kontrol ve karantina', 'Paketleme, sevkiyat ve yükleme', 'Barkod, e-belge, ERP ve servis operasyonları'],
+      en: ['Goods receipt, inbound/outbound and transfers', 'Quality control and quarantine', 'Packing, shipment and loading', 'Barcode, e-document, ERP and service operations']
     },
-    gallery: [
-       "https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=1000&auto=format&fit=crop"
-    ],
-    link: "https://wms.v3rii.com" // DEPO OTOMASYONU LİNKİNİ BURAYA YAZ (Örnek)
+    gallery: [wmsPreview],
+    link: 'https://wms.v3rii.com'
+  },
+  {
+    icon: Factory,
+    logo: utsLogo,
+    title: {
+      tr: 'V3RII UTS',
+      en: 'V3RII UTS'
+    },
+    description: {
+      tr: 'Ürün Takip Sistemi operasyonları için üretim, verme, ters verme, tüketiciye verme, alma, ithalat, ihracat ve imha listelerini yöneten uygulama.',
+      en: 'An operations app for product tracking workflows including production, transfer, reverse transfer, consumer transfer, receipt, import, export and disposal lists.'
+    },
+    features: {
+      tr: ['UTS üretim ve verme listeleri', 'Tüketiciye verme, alma ve ters verme', 'İthalat, ihracat ve imha operasyonları', 'Cari, stok, rol ve izin yönetimi'],
+      en: ['UTS production and transfer lists', 'Consumer transfer, receipt and reverse transfer', 'Import, export and disposal operations', 'Customer, stock, role and permission management']
+    },
+    gallery: [utsLogo],
+    link: 'https://uts.v3rii.com'
   }
 ]

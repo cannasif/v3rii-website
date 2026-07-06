@@ -3,6 +3,7 @@ import Navbar from './components/layout/Navbar'
 import Footer from './components/layout/Footer'
 import Home from './pages/Home'
 import ScrollToTopButton from './components/ui/ScrollToTopButton'
+import SupportChatbot from './features/support-chatbot/components/SupportChatbot'
 
 export type Language = 'tr' | 'en'
 export type Theme = 'dark' | 'light'
@@ -85,6 +86,7 @@ function App() {
       <Home language={language} theme={theme} />
       <Footer language={language} theme={theme} />
       <ScrollToTopButton language={language} theme={theme} />
+      <SupportChatbot language={language} theme={theme} />
     </>
   )
 }

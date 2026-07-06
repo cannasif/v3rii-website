@@ -3,6 +3,8 @@ import { useState } from 'react'
 import { Star, ChevronDown } from 'lucide-react'
 import type { Language, Theme } from '../../App'
 
+type ContactField = 'name' | 'email' | 'product' | 'message'
+
 type Props = {
   language: Language
   theme: Theme
@@ -112,7 +114,7 @@ export default function Contact({ language, theme }: Props) {
       } else {
         setSubmitStatus('error')
       }
-    } catch (error) {
+    } catch {
       setSubmitStatus('error')
     } finally {
       setIsSubmitting(false)
@@ -217,10 +219,10 @@ export default function Contact({ language, theme }: Props) {
             className="relative"
           >
             <form onSubmit={handleSubmit} className="space-y-6" autoComplete="off">
-              {['name', 'email', 'product', 'message'].map((field) => (
+              {(['name', 'email', 'product', 'message'] as ContactField[]).map((field) => (
                 <div key={field}>
                   <label className={`block text-sm font-medium mb-1 ${isLight ? 'text-slate-700' : 'text-gray-300'}`}>
-                    {(text.labels as any)[field]}
+                    {text.labels[field]}
                   </label>
                   
                   {field === 'message' ? (
@@ -285,7 +287,7 @@ export default function Contact({ language, theme }: Props) {
                     <input
                       name={field}
                       autoComplete="new-password"
-                      value={(formData as any)[field]}
+                      value={formData[field]}
                       onChange={handleInputChange}
                       className={`w-full border rounded-xl px-4 py-3 focus:border-cyan-400 focus:shadow-[0_0_15px_rgba(34,211,238,0.4)] focus:outline-none transition-all duration-300 ${
                         isLight ? 'bg-white/80 border-cyan-500/25 text-slate-900 placeholder-slate-400' : 'bg-slate-900/70 border-purple-500/25 text-white placeholder-gray-500'

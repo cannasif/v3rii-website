@@ -5,11 +5,6 @@ import { products } from "../../utils/products";
 import ProductModal from "../ui/ProductModal";
 import type { Language, Theme } from "../../App";
 
-// LOGO IMPORTLARI
-import crmLogo from "../../assets/veriicrmlogo.png";
-import aquaLogo from "../../assets/v3riiaqua.png";
-import vmsLogo from "../../assets/v3riiwms.png"; 
-
 type Product = (typeof products)[number];
 
 type Props = {
@@ -62,13 +57,9 @@ export default function Products({ language, theme }: Props) {
           </div>
         </motion.div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-10 items-stretch">
+        <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-6 sm:gap-8 items-stretch">
           {products.map((product, index) => {
             const Icon = product.icon;
-            
-            const isCrm = index === 0;
-            const isAqua = index === 1;
-            const isVms = index === 2; 
 
             return (
               <motion.div
@@ -79,7 +70,7 @@ export default function Products({ language, theme }: Props) {
                 transition={{ duration: 0.5, delay: index * 0.1 }}
                 onClick={() => setSelectedProduct(product)}
                 // TEMA UYUMLU KART ARKA PLANI VE BORDER'I
-                className={`group cursor-pointer flex flex-col relative backdrop-blur-md border-l-2 border-r-2 p-6 sm:p-8 transition-all duration-300 min-h-[420px] sm:min-h-[480px] hover:border-pink-500 ${
+                className={`group cursor-pointer flex flex-col relative backdrop-blur-md border-l-2 border-r-2 p-6 sm:p-7 transition-all duration-300 min-h-[430px] sm:min-h-[500px] hover:border-pink-500 ${
                   isLight 
                     ? 'bg-white/80 border-purple-300 hover:bg-white hover:shadow-xl' 
                     : 'bg-[#0a0f1a]/80 border-purple-600/40 hover:bg-[#0d1424]/95'
@@ -90,12 +81,8 @@ export default function Products({ language, theme }: Props) {
                 <div className={`relative w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center transform -skew-x-12 mb-6 border transition-all duration-300 shrink-0 group-hover:border-pink-500/50 group-hover:bg-pink-500/20 ${
                   isLight ? 'bg-purple-100 border-purple-200' : 'bg-purple-500/10 border-purple-500/20'
                 }`}>
-                  {isCrm ? (
-                    <img src={crmLogo} alt="CRM Logo" className="w-12 h-12 sm:w-16 sm:h-16 transform skew-x-12 object-contain" />
-                  ) : isAqua ? (
-                    <img src={aquaLogo} alt="AQUA Logo" className="w-12 h-12 sm:w-16 sm:h-16 transform skew-x-12 object-contain" />
-                  ) : isVms ? (
-                    <img src={vmsLogo} alt="WMS Logo" className="w-12 h-12 sm:w-16 sm:h-16 transform skew-x-12 object-contain" />
+                  {product.logo ? (
+                    <img src={product.logo} alt={`${product.title[lang]} Logo`} className="w-12 h-12 sm:w-16 sm:h-16 transform skew-x-12 object-contain" />
                   ) : (
                     <Icon className="w-8 h-8 sm:w-10 sm:h-10 text-pink-400 transform skew-x-12" />
                   )}
@@ -155,9 +142,9 @@ export default function Products({ language, theme }: Props) {
       <ProductModal 
         product={selectedProduct ? {
           ...selectedProduct,
-          title: selectedProduct.title[lang] as any,
-          description: selectedProduct.description[lang] as any,
-          features: selectedProduct.features[lang] as any
+          title: selectedProduct.title[lang],
+          description: selectedProduct.description[lang],
+          features: selectedProduct.features[lang]
         } : null} 
         onClose={() => setSelectedProduct(null)} 
         language={lang}
