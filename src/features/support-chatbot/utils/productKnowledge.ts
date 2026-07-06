@@ -24,6 +24,12 @@ export const productKnowledge: Record<SupportLanguage, Record<SupportProductKey,
         'Yetki, onay rolü, onay akışı, mail ayarları ve sistem araçları'
       ],
       integrations: ['ERP cari/stok referansları', 'Outlook ve mail ayarları', 'WhatsApp entegrasyonu', 'Power BI', 'Hangfire izleme'],
+      parameters: [
+        'Netsis/ERP cari ve stok eşleme kuralları',
+        'Belge seri, teklif/sipariş ve onay akışı tanımları',
+        'Kullanıcı, rol, grup ve indirim limitleri',
+        'Müşteri tipi, temsilci, bölge ve fiyat kural parametreleri'
+      ],
       supportTopics: ['Kullanıcı yetkileri', 'Teklif/sipariş akışı', 'Raporlar', 'ERP entegrasyonu', 'Mail ayarları']
     },
     b2b: {
@@ -48,6 +54,12 @@ export const productKnowledge: Record<SupportLanguage, Record<SupportProductKey,
         'Pazar yeri mağaza kanalları, ürün eşleştirme ve aktarım kayıtları'
       ],
       integrations: ['ERP cari/stok/depo referansları', 'Pazar yeri bağlantıları', 'Ödeme bağlantıları', 'SMTP mail ayarları', 'Trace explorer'],
+      parameters: [
+        'Netsis/ERP cari, stok, depo ve yap-kod referans parametreleri',
+        'Müşteri bazlı katalog görünürlük ve fiyat kuralları',
+        'Stok görünürlüğü, ödeme bağlantısı ve pazar yeri kanal ayarları',
+        'B2B kapsam politikaları, kullanıcı atamaları ve satın alma onay kuralları'
+      ],
       supportTopics: ['Katalog yetkileri', 'Fiyat/stok görünürlüğü', 'Sipariş akışı', 'Ödeme', 'Pazar yeri entegrasyonu']
     },
     wms: {
@@ -72,6 +84,12 @@ export const productKnowledge: Record<SupportLanguage, Record<SupportProductKey,
         'Servis atama, Bilginoğlu hakediş, KKD ve barkod tasarım modülleri'
       ],
       integrations: ['ERP stok/depo/cari referansları', 'eLogo e-Fatura/e-Arşiv', 'Barkod etiket altyapısı', 'Hangfire izleme', 'Mail ayarları'],
+      parameters: [
+        'Netsis/ERP stok, depo, cari ve hareket referans parametreleri',
+        'Depo, raf, lokasyon ve işlem tipi ayarları',
+        'Kalite kural tanımları, karantina akışı ve kontrol parametreleri',
+        'Barkod şablonları, belge serileri, KKD hak matrisi ve servis atama kuralları'
+      ],
       supportTopics: ['Barkod', 'Mal kabul', 'Stok sayımı', 'Kalite/karantina', 'Transfer/sevkiyat', 'ERP referansları']
     },
     uts: {
@@ -96,6 +114,12 @@ export const productKnowledge: Record<SupportLanguage, Record<SupportProductKey,
         'Kullanıcı, rol ve izin grubu yönetimi'
       ],
       integrations: ['UTS/ÜTS operasyon kayıtları', 'Cari ve stok referansları', 'Hangfire izleme', 'Yetki altyapısı'],
+      parameters: [
+        'Netsis/ERP cari ve stok referans eşlemeleri',
+        'UTS işlem türüne göre liste ve durum takipleri',
+        'Kullanıcı, rol ve izin grubu tanımları',
+        'Yetki bazlı operasyon görünürlüğü'
+      ],
       supportTopics: ['UTS üretim', 'UTS verme', 'İthalat/ihracat', 'İmha', 'Rol/yetki']
     }
   },
@@ -122,6 +146,12 @@ export const productKnowledge: Record<SupportLanguage, Record<SupportProductKey,
         'Permissions, approval roles, approval flows, mail settings and system tools'
       ],
       integrations: ['ERP customer/stock references', 'Outlook and mail settings', 'WhatsApp integration', 'Power BI', 'Hangfire monitoring'],
+      parameters: [
+        'Netsis/ERP customer and stock matching rules',
+        'Document serial, quote/order and approval flow definitions',
+        'Users, roles, groups and discount limits',
+        'Customer type, representative, region and pricing rule parameters'
+      ],
       supportTopics: ['User permissions', 'Quote/order flow', 'Reports', 'ERP integration', 'Mail settings']
     },
     b2b: {
@@ -146,6 +176,12 @@ export const productKnowledge: Record<SupportLanguage, Record<SupportProductKey,
         'Marketplace channels, listing matching and transfer events'
       ],
       integrations: ['ERP customer/stock/warehouse references', 'Marketplace connections', 'Payment integrations', 'SMTP mail settings', 'Trace explorer'],
+      parameters: [
+        'Netsis/ERP customer, stock, warehouse and custom-code reference parameters',
+        'Customer-based catalog visibility and pricing rules',
+        'Inventory visibility, payment connection and marketplace channel settings',
+        'B2B scope policies, user assignments and purchase approval rules'
+      ],
       supportTopics: ['Catalog permissions', 'Price/inventory visibility', 'Order flow', 'Payments', 'Marketplace integration']
     },
     wms: {
@@ -170,6 +206,12 @@ export const productKnowledge: Record<SupportLanguage, Record<SupportProductKey,
         'Service allocation, Bilginoglu progress-payment, PPE and barcode designer modules'
       ],
       integrations: ['ERP stock/warehouse/customer references', 'eLogo e-Invoice/e-Archive', 'Barcode label infrastructure', 'Hangfire monitoring', 'Mail settings'],
+      parameters: [
+        'Netsis/ERP stock, warehouse, customer and transaction reference parameters',
+        'Warehouse, shelf, location and operation type settings',
+        'Quality rule definitions, quarantine flow and control parameters',
+        'Barcode templates, document serials, PPE entitlement matrix and service allocation rules'
+      ],
       supportTopics: ['Barcode', 'Goods receipt', 'Stock count', 'Quality/quarantine', 'Transfer/shipment', 'ERP references']
     },
     uts: {
@@ -194,6 +236,12 @@ export const productKnowledge: Record<SupportLanguage, Record<SupportProductKey,
         'User, role and permission group management'
       ],
       integrations: ['UTS operation records', 'Customer and stock references', 'Hangfire monitoring', 'Permission infrastructure'],
+      parameters: [
+        'Netsis/ERP customer and stock reference matching',
+        'List and status tracking by UTS operation type',
+        'User, role and permission group definitions',
+        'Permission-based operation visibility'
+      ],
       supportTopics: ['UTS production', 'UTS transfer', 'Import/export', 'Disposal', 'Roles/permissions']
     }
   }

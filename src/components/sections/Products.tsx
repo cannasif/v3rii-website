@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Smartphone, ChevronRight } from "lucide-react"; 
+import { ChevronRight, CircuitBoard, SlidersHorizontal, Smartphone } from "lucide-react"; 
 import { products } from "../../utils/products";
 import ProductModal from "../ui/ProductModal";
 import type { Language, Theme } from "../../App";
@@ -18,13 +18,19 @@ const translations = {
     sectionTitlePre: "Yazılım",
     sectionTitleHighlight: "Ürünlerimiz",
     buttonText: "İncele",
-    mobileBadgeHover: "Mobil Uyumlu"
+    mobileBadgeHover: "Mobil Uyumlu",
+    moduleLabel: "Modül",
+    parameterLabel: "Parametre",
+    integrationLabel: "Entegrasyon"
   },
   en: {
     sectionTitlePre: "Our Software",
     sectionTitleHighlight: "Products",
     buttonText: "Explore",
-    mobileBadgeHover: "Mobile Compatible"
+    mobileBadgeHover: "Mobile Compatible",
+    moduleLabel: "Modules",
+    parameterLabel: "Parameters",
+    integrationLabel: "Integrations"
   }
 };
 
@@ -36,7 +42,7 @@ export default function Products({ language, theme }: Props) {
   const isLight = theme === 'light'; // TEMA KONTROLÜ EKLENDİ
 
   return (
-    <section id="products" className="py-12 sm:py-20 lg:py-24 px-4 sm:px-6 lg:px-8 relative z-10 overflow-hidden bg-transparent font-modern">
+    <section id="products" className="scroll-mt-48 pt-36 pb-16 sm:pt-44 sm:pb-24 lg:pt-52 lg:pb-28 px-4 sm:px-6 lg:px-8 relative z-10 overflow-hidden bg-transparent font-modern">
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         
@@ -70,7 +76,7 @@ export default function Products({ language, theme }: Props) {
                 transition={{ duration: 0.5, delay: index * 0.1 }}
                 onClick={() => setSelectedProduct(product)}
                 // TEMA UYUMLU KART ARKA PLANI VE BORDER'I
-                className={`group cursor-pointer flex flex-col relative backdrop-blur-md border-l-2 border-r-2 p-6 sm:p-7 transition-all duration-300 min-h-[430px] sm:min-h-[500px] hover:border-pink-500 ${
+                className={`group cursor-pointer flex flex-col relative backdrop-blur-md border-l-2 border-r-2 p-5 sm:p-6 transition-all duration-300 min-h-[520px] hover:border-pink-500 ${
                   isLight 
                     ? 'bg-white/80 border-purple-300 hover:bg-white hover:shadow-xl' 
                     : 'bg-[#0a0f1a]/80 border-purple-600/40 hover:bg-[#0d1424]/95'
@@ -78,7 +84,7 @@ export default function Products({ language, theme }: Props) {
                 style={{ clipPath: 'polygon(10% 0, 100% 0, 100% 92%, 90% 100%, 0 100%, 0 8%)' }}
               >
                 {/* Logo Bölümü */}
-                <div className={`relative w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center transform -skew-x-12 mb-6 border transition-all duration-300 shrink-0 group-hover:border-pink-500/50 group-hover:bg-pink-500/20 ${
+                <div className={`relative w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center transform -skew-x-12 mb-5 border transition-all duration-300 shrink-0 group-hover:border-pink-500/50 group-hover:bg-pink-500/20 ${
                   isLight ? 'bg-purple-100 border-purple-200' : 'bg-purple-500/10 border-purple-500/20'
                 }`}>
                   {product.logo ? (
@@ -94,18 +100,41 @@ export default function Products({ language, theme }: Props) {
                 }`}>
                   {product.title[lang]}
                 </h3>
+
+                <p className={`mb-3 text-[11px] sm:text-xs font-bold uppercase tracking-[0.18em] ${isLight ? 'text-cyan-700' : 'text-cyan-300'}`}>
+                  {product.eyebrow[lang]}
+                </p>
                 
-                <div className="w-8 sm:w-10 h-0.5 bg-gradient-to-r from-pink-500 to-purple-500 mb-4 sm:mb-5 group-hover:w-16 sm:group-hover:w-20 transition-all duration-500" />
+                <div className="w-8 sm:w-10 h-0.5 bg-gradient-to-r from-pink-500 to-purple-500 mb-4 group-hover:w-16 sm:group-hover:w-20 transition-all duration-500" />
                 
                 {/* Açıklama */}
-                <p className={`text-xs sm:text-sm leading-relaxed mb-6 font-modern flex-grow ${
+                <p className={`text-xs sm:text-sm leading-relaxed mb-5 font-modern ${
                   isLight ? 'text-slate-600' : 'text-gray-400'
                 }`}>
                   {product.description[lang]}
                 </p>
+
+                <div className="grid grid-cols-3 gap-2 mb-5">
+                  {[
+                    { icon: CircuitBoard, label: t.moduleLabel, value: product.modules[lang].length },
+                    { icon: SlidersHorizontal, label: t.parameterLabel, value: product.parameters[lang].length },
+                    { icon: ChevronRight, label: t.integrationLabel, value: product.integrations[lang].length }
+                  ].map((metric) => {
+                    const MetricIcon = metric.icon;
+                    return (
+                      <div key={metric.label} className={`min-h-[62px] rounded-lg border px-2 py-2 ${isLight ? 'bg-white/70 border-cyan-200 text-slate-700' : 'bg-white/[0.04] border-cyan-400/20 text-slate-300'}`}>
+                        <div className="flex items-center justify-between gap-1">
+                          <MetricIcon className="h-3.5 w-3.5 text-cyan-400" />
+                          <span className="text-sm font-black text-pink-500">{metric.value}</span>
+                        </div>
+                        <div className="mt-1 text-[9px] font-bold uppercase leading-tight tracking-wide">{metric.label}</div>
+                      </div>
+                    );
+                  })}
+                </div>
                 
                 {/* Özellik Listesi */}
-                <div className={`space-y-2 sm:space-y-3 mb-8 text-[10px] sm:text-xs font-modern ${
+                <div className={`space-y-2 mb-6 text-[10px] sm:text-xs font-modern ${
                   isLight ? 'text-slate-700' : 'text-gray-300'
                 }`}>
                   {product.features[lang].map((f: string, i: number) => (
@@ -143,8 +172,12 @@ export default function Products({ language, theme }: Props) {
         product={selectedProduct ? {
           ...selectedProduct,
           title: selectedProduct.title[lang],
+          eyebrow: selectedProduct.eyebrow[lang],
           description: selectedProduct.description[lang],
-          features: selectedProduct.features[lang]
+          features: selectedProduct.features[lang],
+          modules: selectedProduct.modules[lang],
+          integrations: selectedProduct.integrations[lang],
+          parameters: selectedProduct.parameters[lang]
         } : null} 
         onClose={() => setSelectedProduct(null)} 
         language={lang}

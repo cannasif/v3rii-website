@@ -1,11 +1,15 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ChevronRight, Terminal, Cpu } from "lucide-react"; 
+import { X, ChevronRight, Terminal, Cpu, Network, SlidersHorizontal, Layers3 } from "lucide-react"; 
 import type { Language, Theme } from "../../App";
 
 type Product = {
   title: string;
+  eyebrow?: string;
   description: string;
   features: string[];
+  modules?: string[];
+  integrations?: string[];
+  parameters?: string[];
   gallery?: string[] | string | { tr: string[]; en: string[] }; 
   link?: string; // Link desteği (bir önceki güncellemeden)
 };
@@ -21,8 +25,22 @@ export default function ProductModal({ product, onClose, language, theme }: Prod
   const isLight = theme === "light";
   
   const text = {
-    tr: { systemActive: "Sistem_Aktif", features: "Özellikler //", launch: "Sistemi Başlat" },
-    en: { systemActive: "System_Online", features: "Features //", launch: "Launch System" },
+    tr: {
+      systemActive: "Sistem_Aktif",
+      features: "Özellikler //",
+      modules: "Modül Grupları",
+      integrations: "Entegrasyon Katmanı",
+      parameters: "Parametrik Yapı",
+      launch: "Sistemi Başlat"
+    },
+    en: {
+      systemActive: "System_Online",
+      features: "Features //",
+      modules: "Module Groups",
+      integrations: "Integration Layer",
+      parameters: "Parametric Setup",
+      launch: "Launch System"
+    },
   }[language];
 
   // Sisteme gitmek için fonksiyon (bir önceki güncellemeden)
@@ -54,7 +72,7 @@ export default function ProductModal({ product, onClose, language, theme }: Prod
             exit={{ scale: 0.95, y: 20, opacity: 0 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
             onClick={(e) => e.stopPropagation()} // Modal içine tıklayınca kapanmasın
-            className={`w-full max-w-6xl max-h-[92vh] border border-pink-500/30 shadow-[0_0_50px_rgba(219,39,119,0.2)] relative flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden ${
+            className={`w-full max-w-7xl max-h-[92vh] border border-pink-500/30 shadow-[0_0_50px_rgba(219,39,119,0.2)] relative flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden ${
               isLight ? "bg-white/95" : "bg-[#0a0f1a]/95" // Modalın kendi arka planı korundu
             }`}
             style={{ 
@@ -73,7 +91,7 @@ export default function ProductModal({ product, onClose, language, theme }: Prod
 
             {/* SOL KISIM */}
             <div 
-              className={`w-full lg:w-3/5 relative aspect-video lg:aspect-auto min-h-[250px] sm:min-h-[400px] border-b lg:border-b-0 lg:border-r border-pink-500/30 overflow-hidden flex items-center justify-center ${
+              className={`w-full lg:w-5/12 relative aspect-video lg:aspect-auto min-h-[250px] sm:min-h-[400px] border-b lg:border-b-0 lg:border-r border-pink-500/30 overflow-hidden flex items-center justify-center ${
                 isLight ? "bg-slate-200" : "bg-black"
               }`}
             >
@@ -113,7 +131,7 @@ export default function ProductModal({ product, onClose, language, theme }: Prod
             </div>
 
             {/* SAĞ KISIM: BİLGİLER */}
-            <div className={`w-full lg:w-2/5 p-5 sm:p-8 lg:p-10 flex flex-col relative ${
+            <div className={`w-full lg:w-7/12 p-5 sm:p-8 lg:p-10 flex flex-col relative ${
               isLight ? "bg-gradient-to-br from-white to-cyan-50" : "bg-gradient-to-br from-[#0a0f1a] to-[#120a1a]"
             }`}>
               <div className="flex items-center gap-2 mb-4">
@@ -122,6 +140,12 @@ export default function ProductModal({ product, onClose, language, theme }: Prod
                   V3RII_DATABASE
                 </span>
               </div>
+
+              {product.eyebrow ? (
+                <p className="mb-2 text-[11px] sm:text-xs font-bold uppercase tracking-[0.22em] text-cyan-400">
+                  {product.eyebrow}
+                </p>
+              ) : null}
 
               <h2 className={`text-2xl sm:text-3xl lg:text-4xl font-bold uppercase tracking-wider font-cyber mb-3 ${isLight ? "text-slate-900" : "text-white"}`}>
                 {product.title}
@@ -133,7 +157,7 @@ export default function ProductModal({ product, onClose, language, theme }: Prod
                 {product.description}
               </p>
 
-              <div className="space-y-3 mb-8">
+              <div className="space-y-3 mb-6">
                 <h4 className="text-pink-400 font-cyber text-sm sm:text-base uppercase tracking-widest">{text.features}</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2">
                   {product.features.map((feature, idx) => (
@@ -145,6 +169,34 @@ export default function ProductModal({ product, onClose, language, theme }: Prod
                     </div>
                   ))}
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 mb-8">
+                {[
+                  { title: text.modules, icon: Layers3, items: product.modules ?? [] },
+                  { title: text.integrations, icon: Network, items: product.integrations ?? [] },
+                  { title: text.parameters, icon: SlidersHorizontal, items: product.parameters ?? [] }
+                ].map((section) => {
+                  const SectionIcon = section.icon;
+                  if (section.items.length === 0) return null;
+
+                  return (
+                    <div key={section.title} className={`rounded-xl border p-3 ${isLight ? "border-cyan-200 bg-white/75" : "border-cyan-400/20 bg-white/[0.04]"}`}>
+                      <div className="mb-2 flex items-center gap-2">
+                        <SectionIcon className="h-4 w-4 text-cyan-400" />
+                        <h4 className={`text-xs font-black uppercase tracking-[0.18em] ${isLight ? "text-slate-800" : "text-slate-100"}`}>{section.title}</h4>
+                      </div>
+                      <div className="space-y-1.5">
+                        {section.items.map((item, idx) => (
+                          <div key={`${section.title}-${idx}`} className={`flex items-start gap-2 text-xs leading-relaxed ${isLight ? "text-slate-600" : "text-slate-300"}`}>
+                            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rotate-45 bg-cyan-400" />
+                            <span>{item}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
               <button 

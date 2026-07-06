@@ -68,6 +68,7 @@ const text = {
     keyFeatures: 'Öne çıkan modüller',
     moduleGroups: 'Uygulama içinde gördüğümüz ana modül grupları',
     integrations: 'Entegrasyon ve altyapı',
+    parameters: 'Parametrik yapı',
     supportTopics: 'Sık destek konuları',
     portfolio: 'Tüm ürünleri özetle',
     actions: {
@@ -111,6 +112,7 @@ const text = {
     keyFeatures: 'Key modules',
     moduleGroups: 'Main module groups identified in the apps',
     integrations: 'Integrations and infrastructure',
+    parameters: 'Parametric setup',
     supportTopics: 'Common support topics',
     portfolio: 'Summarize all products',
     actions: {
@@ -191,12 +193,14 @@ export default function SupportChatbot({ language, theme }: Props) {
   const describeProduct = (productKey: SupportProductKey, activeLanguage = lead.language) => {
     const product = productKnowledge[activeLanguage][productKey]
     return [
+      `${product.title}`,
       `${text[activeLanguage].productAnswerPrefix}: ${product.summary}`,
       `${text[activeLanguage].idealFor}: ${product.idealFor}`,
-      `${text[activeLanguage].keyFeatures}: ${product.features.join(', ')}`,
-      `${text[activeLanguage].moduleGroups}: ${product.modules.join(', ')}`,
-      `${text[activeLanguage].integrations}: ${product.integrations.join(', ')}`,
-      `${text[activeLanguage].supportTopics}: ${product.supportTopics.join(', ')}`
+      `${text[activeLanguage].keyFeatures}:\n${product.features.map((item) => `- ${item}`).join('\n')}`,
+      `${text[activeLanguage].moduleGroups}:\n${product.modules.map((item) => `- ${item}`).join('\n')}`,
+      `${text[activeLanguage].integrations}:\n${product.integrations.map((item) => `- ${item}`).join('\n')}`,
+      `${text[activeLanguage].parameters}:\n${product.parameters.map((item) => `- ${item}`).join('\n')}`,
+      `${text[activeLanguage].supportTopics}:\n${product.supportTopics.map((item) => `- ${item}`).join('\n')}`
     ].join('\n\n')
   }
 

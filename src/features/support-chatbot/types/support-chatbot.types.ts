@@ -32,6 +32,7 @@ export type ProductKnowledge = {
   features: string[]
   modules: string[]
   integrations: string[]
+  parameters: string[]
   supportTopics: string[]
 }
 
