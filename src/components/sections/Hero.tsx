@@ -1,9 +1,8 @@
 import { motion } from 'framer-motion'
 import AnimatedButton from '../ui/AnimatedButton'
-import FloatingOrbs from '../ui/FloatingOrbs'
-import ParticleField from '../ui/ParticleField'
 import { fadeInUp, staggerContainer } from '../../utils/animations'
 import { useScrollToSection } from '../../hooks/useScrollToSection'
+import { useGlitchPulse } from '../../hooks/useGlitchPulse'
 import { useState } from 'react'
 import VideoModal from '../ui/VideoModal'
 import type { Language, Theme } from '../../App'
@@ -20,13 +19,17 @@ export default function Hero({ language, theme }: Props) {
   const scrollToSection = useScrollToSection(80)
   const [isVideoOpen, setIsVideoOpen] = useState(false)
   const isLight = theme === 'light'
+  // 20 saniyede bir tüm hero kartı glitch yapar
+  const cardGlitch = useGlitchPulse(20000, 550)
 
   const content = {
     tr: {
-      title1: 'Geleceğin',
-      title2: 'Yazılım Çözümleri',
+      // Font (Bruno Ace SC) harfleri büyük gösterdiği için Türkçe İ/ı doğru çıksın diye
+      // başlıklar elle büyük harf yazılıyor (otomatik uppercase İ'yi I yapar)
+      title1: 'GELECEĞİN',
+      title2: 'YAZILIM ÇÖZÜMLERİ',
       description:
-        'İşletmenizi dijital dönüşümde öne çıkaracak, AI destekli ve gelecek odaklı yazılım çözümleri geliştiriyoruz.',
+        'Yapay zeka destekli sistemlerle iş süreçlerinizi otomatikleştiriyor, verinizi değere dönüştürüyoruz. Geleceğin teknolojisi, bugünden işletmenizde.',
       discover: 'Ürünleri Keşfet',
       demo: 'Demo İzle'
     },
@@ -34,34 +37,60 @@ export default function Hero({ language, theme }: Props) {
       title1: 'Future-Ready',
       title2: 'Software Solutions',
       description:
-        'We build AI-powered and future-focused software solutions to accelerate your digital transformation.',
+        'We automate your workflows with AI-powered systems and turn your data into value — bringing tomorrow\'s technology to your business today.',
       discover: 'Explore Products',
       demo: 'Watch Demo'
     }
   }[language]
 
   return (
-    <section id="home" className="pt-20 pb-20 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+    <section id="home" className="pt-28 sm:pt-32 lg:pt-36 pb-20 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+      {/* Karıncalanma (statik parazit) efekti — uçuşan baloncukların yerine */}
+      <div className="cyber-noise" aria-hidden="true" />
+
       <div className="max-w-7xl mx-auto relative z-10">
         <motion.div
-          className={`text-center rounded-[28px] px-4 sm:px-10 py-12 border-l-2 border-r-2 backdrop-blur-xl ${
-            isLight ? 'bg-white/65 border-cyan-400/45' : 'bg-white/[0.02] border-purple-500/35'
-          }`}
+          className={`relative text-center px-4 sm:px-10 py-12 border backdrop-blur-xl overflow-hidden ${
+            isLight ? 'bg-white/65 border-cyan-400/45' : 'bg-white/[0.02] border-cyan-500/20'
+          } ${cardGlitch ? 'cyber-card-glitch-active' : ''}`}
+          style={{ clipPath: 'polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 22px 100%, 0 calc(100% - 22px))' }}
           variants={staggerContainer}
           initial="initial"
           animate="animate"
         >
+          {/* Terminal köşe çerçeveleri */}
+          <span className="cyber-frame-corner cyber-frame-corner-tl" aria-hidden="true" />
+          <span className="cyber-frame-corner cyber-frame-corner-tr" aria-hidden="true" />
+          <span className="cyber-frame-corner cyber-frame-corner-bl" aria-hidden="true" />
+          <span className="cyber-frame-corner cyber-frame-corner-br" aria-hidden="true" />
+
+          {/* Scanline dokusu */}
+          <div className="cyber-panel-scanline" aria-hidden="true" />
+
+          {/* Terminal başlık satırı */}
+          <motion.div
+            variants={fadeInUp}
+            className={`font-mono text-[10px] sm:text-xs tracking-[0.3em] uppercase mb-6 flex items-center justify-center gap-2 ${
+              isLight ? 'text-cyan-700/80' : 'text-cyan-400/70'
+            }`}
+          >
+            <span className="text-pink-500">{'>_'}</span>
+            <span>SYS.BOOT // V3RII</span>
+            <span className="cyber-caret" aria-hidden="true">▊</span>
+          </motion.div>
+
           <motion.h1
             variants={fadeInUp}
-            className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-6 relative"
+            className="font-cyber text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-6 relative tracking-wide"
           >
             <span className="relative inline-block">
-              <span className="bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+              {/* Logo renkleri: magenta → turuncu → altın sarısı */}
+              <span className="bg-gradient-to-r from-pink-500 via-orange-400 to-amber-400 bg-clip-text text-transparent drop-shadow-[0_0_18px_rgba(236,72,153,0.35)]">
                 {content.title1}
               </span>
             </span>
             <br />
-            <span className="relative inline-block">
+            <span className="relative inline-block mt-2">
               <span className={isLight ? 'text-slate-900' : 'text-white'}>{content.title2}</span>
             </span>
           </motion.h1>
@@ -93,9 +122,6 @@ export default function Hero({ language, theme }: Props) {
             />
           </motion.div>
         </motion.div>
-
-        <FloatingOrbs />
-        {!isLight && <ParticleField count={30} />}
       </div>
 
       <VideoModal
