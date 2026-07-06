@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+@theme {
+  /* Cyber başlık fontu: index.html'de yüklü Bruno Ace SC */
+  --font-cyber: "Bruno Ace SC", ui-monospace, "Cascadia Code", monospace;
+  --font-modern: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
 html, body {
   background: radial-gradient(circle at top, #0c0f1c 0%, #1a0e2b 45%, #0d0a14 100%) !important;
   min-height: 100vh;
@@ -26,20 +32,134 @@ html.light #root {
   color: #111827;
 }
 
-html.light body::before {
-  content: "";
+/* ============================
+   CRT / TÜPLÜ TV ARKA PLANI
+   Grain + tarama çizgileri + yavaş parlaklık bandı + nadir glitch
+============================ */
+
+.crt-bg {
   position: fixed;
   inset: 0;
+  z-index: 1;
   pointer-events: none;
-  z-index: 0;
-  opacity: 0.2;
+  overflow: hidden;
+}
+
+/* Karıncalı grain dokusu */
+.crt-bg::before {
+  content: "";
+  position: absolute;
+  inset: -80px;
+  opacity: 0.07;
+  mix-blend-mode: soft-light;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='250' height='250'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 250px 250px;
+  animation: crtGrainShift 0.45s steps(4) infinite;
+}
+
+html.light .crt-bg::before {
+  opacity: 0.06;
+  mix-blend-mode: multiply;
+}
+
+/* İnce tarama çizgileri */
+.crt-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.16;
   background: repeating-linear-gradient(
     180deg,
-    transparent 0px,
-    transparent 2px,
-    rgba(14, 116, 144, 0.16) 3px,
-    rgba(14, 116, 144, 0.16) 4px
+    rgba(0, 0, 0, 0.55) 0px,
+    rgba(0, 0, 0, 0.55) 1px,
+    transparent 1px,
+    transparent 3px
   );
+}
+
+html.light .crt-bg::after {
+  opacity: 0.1;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(14, 116, 144, 0.5) 0px,
+    rgba(14, 116, 144, 0.5) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+/* Ekranda yavaşça aşağı süzülen parlaklık bandı (tüplü TV tazeleme hissi) */
+.crt-roll {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 22vh;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.008) 45%,
+    rgba(255, 255, 255, 0.015) 50%,
+    rgba(255, 255, 255, 0.008) 55%,
+    transparent 100%
+  );
+  animation: crtRoll 13s linear infinite;
+}
+
+html.light .crt-roll {
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(14, 116, 144, 0.012) 45%,
+    rgba(14, 116, 144, 0.02) 50%,
+    rgba(14, 116, 144, 0.012) 55%,
+    transparent 100%
+  );
+}
+
+/* Çok nadir tetiklenen yatay glitch bandı */
+.crt-glitch {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 4px;
+  opacity: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(34, 211, 238, 0.5) 12%,
+    rgba(236, 72, 153, 0.55) 40%,
+    rgba(251, 191, 36, 0.4) 68%,
+    transparent 100%
+  );
+  box-shadow:
+    0 -14px 0 rgba(236, 72, 153, 0.18),
+    0 22px 0 rgba(34, 211, 238, 0.14);
+  animation: crtGlitchBand 27s linear infinite;
+}
+
+@keyframes crtGrainShift {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(-42px, 28px); }
+  50% { transform: translate(56px, -34px); }
+  75% { transform: translate(-30px, -48px); }
+  100% { transform: translate(0, 0); }
+}
+
+@keyframes crtRoll {
+  0% { transform: translateY(-25vh); }
+  100% { transform: translateY(105vh); }
+}
+
+@keyframes crtGlitchBand {
+  0%, 95.6% { opacity: 0; transform: translateY(8vh) skewX(0deg); }
+  95.9% { opacity: 0.85; transform: translateY(14vh) skewX(-8deg); }
+  96.2% { opacity: 0; transform: translateY(18vh) skewX(0deg); }
+  96.9% { opacity: 0; transform: translateY(52vh) skewX(0deg); }
+  97.2% { opacity: 0.65; transform: translateY(58vh) skewX(6deg); }
+  97.5% { opacity: 0; transform: translateY(64vh) skewX(0deg); }
+  98.1% { opacity: 0.4; transform: translateY(30vh) skewX(-4deg); }
+  98.35%, 100% { opacity: 0; transform: translateY(30vh) skewX(0deg); }
 }
 
 
@@ -197,8 +317,10 @@ html.light body::before {
 ============================ */
 
 .logo-hover-fx {
-  position: absolute;
+  position: relative;
   isolation: isolate;
+  line-height: 0;
+  font-size: 0;
 }
 
 .logo-hover-image {
@@ -307,6 +429,829 @@ html.light body::before {
     opacity: 0.48;
     transform: translate(5px, 1.4px);
   }
+}
+
+/* ============================
+   CYBER HERO / TERMINAL PANEL
+============================ */
+
+.cyber-frame-corner {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-color: rgba(45, 212, 191, 0.7);
+  pointer-events: none;
+  z-index: 20;
+}
+
+.cyber-frame-corner-tl { top: 6px; left: 6px; border-top: 2px solid; border-left: 2px solid; }
+.cyber-frame-corner-tr { top: 6px; right: 28px; border-top: 2px solid; border-right: 2px solid; }
+.cyber-frame-corner-bl { bottom: 6px; left: 28px; border-bottom: 2px solid; border-left: 2px solid; }
+.cyber-frame-corner-br { bottom: 6px; right: 6px; border-bottom: 2px solid; border-right: 2px solid; }
+
+html.light .cyber-frame-corner {
+  border-color: rgba(13, 148, 136, 0.7);
+}
+
+.cyber-panel-scanline {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.05;
+  background: repeating-linear-gradient(
+    180deg,
+    transparent 0px,
+    transparent 3px,
+    rgba(0, 255, 255, 0.55) 4px,
+    rgba(0, 255, 255, 0.55) 5px
+  );
+}
+
+html.light .cyber-panel-scanline {
+  opacity: 0.06;
+  background: repeating-linear-gradient(
+    180deg,
+    transparent 0px,
+    transparent 3px,
+    rgba(8, 145, 178, 0.4) 4px,
+    rgba(8, 145, 178, 0.4) 5px
+  );
+}
+
+.cyber-caret {
+  display: inline-block;
+  animation: cyberCaretBlink 1s step-end infinite;
+  color: #2dd4bf;
+  font-size: 0.9em;
+}
+
+@keyframes cyberCaretBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Hero kartın periyodik glitch'i */
+.cyber-card-glitch-active {
+  animation: cyberCardGlitch 0.55s steps(3, end) 1;
+}
+
+@keyframes cyberCardGlitch {
+  0% { transform: translate(0) skewX(0deg); filter: none; }
+  12% { transform: translate(-7px, 2px) skewX(-1.2deg); filter: hue-rotate(50deg) saturate(1.6); }
+  28% { transform: translate(6px, -3px) skewX(0.8deg); filter: hue-rotate(-40deg) contrast(1.3); }
+  45% { transform: translate(-4px, 1px) skewX(-0.5deg); filter: hue-rotate(25deg) saturate(1.3) brightness(1.15); }
+  62% { transform: translate(5px, 2px) skewX(0.9deg); filter: hue-rotate(-60deg); }
+  80% { transform: translate(-2px, -1px) skewX(-0.3deg); filter: hue-rotate(15deg) brightness(1.08); }
+  100% { transform: translate(0) skewX(0deg); filter: none; }
+}
+
+/* Karıncalanma (TV statik paraziti) — SVG fractalNoise, kare adımlarla titrer.
+   soft-light blend: zemini beyazlatmasın; mask: bölümler üst üste bindiğinde
+   kenarları belli olmasın diye üst/alt uçlara doğru eriyip kaybolur. */
+.cyber-noise {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.05;
+  mix-blend-mode: soft-light;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='250' height='250'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 250px 250px;
+  animation: cyberNoiseShift 0.5s steps(5) infinite;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 14%, #000 86%, transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0%, #000 14%, #000 86%, transparent 100%);
+}
+
+html.light .cyber-noise {
+  opacity: 0.05;
+  mix-blend-mode: multiply;
+}
+
+@keyframes cyberNoiseShift {
+  0% { background-position: 0 0; }
+  20% { background-position: -60px 40px; }
+  40% { background-position: 90px -30px; }
+  60% { background-position: -45px -70px; }
+  80% { background-position: 70px 55px; }
+  100% { background-position: 0 0; }
+}
+
+/* ============================
+   CYBER PRODUCT WHEEL (3D ÇARK)
+============================ */
+
+/* Çarkın altındaki neon zemin halkası */
+.cyber-wheel-floor {
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at center, rgba(45, 212, 191, 0.16) 0%, rgba(236, 72, 153, 0.08) 42%, transparent 70%);
+  box-shadow: 0 0 60px rgba(45, 212, 191, 0.08);
+  animation: cyberFloorPulse 4s ease-in-out infinite;
+}
+
+html.light .cyber-wheel-floor {
+  background:
+    radial-gradient(ellipse at center, rgba(13, 148, 136, 0.18) 0%, rgba(219, 39, 119, 0.08) 42%, transparent 70%);
+}
+
+@keyframes cyberFloorPulse {
+  0%, 100% { opacity: 0.75; }
+  50% { opacity: 1; }
+}
+
+/* Kart üzerinden geçen ışık süpürmesi — "canlı" hissi */
+.cyber-wheel-card-sweep {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    transparent 42%,
+    rgba(45, 212, 191, 0.10) 50%,
+    transparent 58%,
+    transparent 100%
+  );
+  background-size: 260% 100%;
+  animation: cyberCardSweep 5.5s linear infinite;
+}
+
+@keyframes cyberCardSweep {
+  0% { background-position: 130% 0; }
+  100% { background-position: -130% 0; }
+}
+
+.cyber-wheel-card {
+  will-change: opacity, filter;
+}
+
+/* Hafif kart glitch'i — kart karşıya gelince ve 15-20 sn'de bir */
+.cyber-card-glitch-soft {
+  animation: cyberCardGlitchSoft 0.55s steps(4, end) 1;
+}
+
+@keyframes cyberCardGlitchSoft {
+  0% { transform: translate(0); filter: none; }
+  18% { transform: translate(-3px, 1px) skewX(-0.6deg); filter: hue-rotate(35deg) saturate(1.4); }
+  36% { transform: translate(2px, -1px) skewX(0.5deg); filter: hue-rotate(-25deg) contrast(1.15); }
+  55% { transform: translate(-2px, 0) skewX(-0.3deg); filter: saturate(1.5) brightness(1.1); }
+  75% { transform: translate(1px, 1px); filter: hue-rotate(15deg); }
+  100% { transform: translate(0); filter: none; }
+}
+
+/* ============================
+   CYBER NAVBAR + TERMINAL UI
+============================ */
+
+.cyber-navbar {
+  isolation: isolate;
+  overflow: visible;
+  /* En üstteyken görünmez (şeffaf) alt çizgi: rengi tanımsız bırakılırsa currentColor'a
+     (koyuda beyaz, açıkta siyah) düşüyor. Scroll'da turkuaz devralıyor. */
+  border-bottom: 1px solid transparent;
+}
+
+.cyber-navbar-scrolled-dark {
+  background: linear-gradient(180deg, rgba(6, 10, 18, 0.92) 0%, rgba(8, 12, 22, 0.78) 100%);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(45, 212, 191, 0.45);
+  box-shadow:
+    0 1px 0 rgba(45, 212, 191, 0.18),
+    0 4px 18px rgba(45, 212, 191, 0.14);
+}
+
+.cyber-navbar-scrolled-light {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0%, rgba(236, 254, 255, 0.75) 100%);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(20, 184, 166, 0.5);
+  box-shadow: 0 4px 18px rgba(20, 184, 166, 0.12);
+}
+
+.cyber-navbar-scanline {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.04;
+  background: repeating-linear-gradient(
+    180deg,
+    transparent 0px,
+    transparent 2px,
+    rgba(0, 255, 255, 0.5) 3px,
+    rgba(0, 255, 255, 0.5) 4px
+  );
+}
+
+html.light .cyber-navbar-scanline {
+  opacity: 0.06;
+  background: repeating-linear-gradient(
+    180deg,
+    transparent 0px,
+    transparent 2px,
+    rgba(8, 145, 178, 0.35) 3px,
+    rgba(8, 145, 178, 0.35) 4px
+  );
+}
+
+.cyber-navbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 6px;
+  border: 1px solid rgba(34, 211, 238, 0.2);
+  background: linear-gradient(135deg, rgba(0, 20, 30, 0.55) 0%, rgba(10, 8, 24, 0.45) 100%);
+  clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
+  flex-shrink: 0;
+  position: relative;
+  z-index: 30;
+  pointer-events: auto;
+}
+
+html.light .cyber-navbar-controls {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(224, 247, 255, 0.8) 100%);
+  border-color: rgba(6, 182, 212, 0.35);
+}
+
+.cyber-navbar-controls-mobile {
+  padding: 3px 6px;
+  gap: 6px;
+}
+
+.cyber-navbar-divider {
+  width: 1px;
+  height: 22px;
+  background: linear-gradient(180deg, transparent, rgba(34, 211, 238, 0.5), transparent);
+  flex-shrink: 0;
+}
+
+.cyber-mobile-toggle {
+  border: 1px solid rgba(34, 211, 238, 0.25);
+  clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
+  background: rgba(0, 0, 0, 0.25);
+}
+
+html.light .cyber-mobile-toggle {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(6, 182, 212, 0.35);
+}
+
+/* --- Cyber Button --- */
+
+.cyber-btn {
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+}
+
+.cyber-btn-corner {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-color: rgba(34, 211, 238, 0.7);
+  pointer-events: none;
+  z-index: 30;
+  transition: border-color 200ms ease;
+}
+
+.cyber-btn-corner-tl { top: 0; left: 0; border-top: 1px solid; border-left: 1px solid; }
+.cyber-btn-corner-tr { top: 0; right: 0; border-top: 1px solid; border-right: 1px solid; }
+.cyber-btn-corner-bl { bottom: 0; left: 0; border-bottom: 1px solid; border-left: 1px solid; }
+.cyber-btn-corner-br { bottom: 0; right: 0; border-bottom: 1px solid; border-right: 1px solid; }
+
+.cyber-btn:hover .cyber-btn-corner {
+  border-color: rgba(0, 255, 255, 1);
+  box-shadow: 0 0 6px rgba(0, 255, 255, 0.5);
+}
+
+.cyber-btn-text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  line-height: 1;
+  text-align: center;
+}
+
+.cyber-btn-text.cyber-btn-glitch-hover {
+  animation: cyberBtnTextGlitch 0.42s steps(3, end) infinite;
+}
+
+.cyber-btn-text.cyber-btn-glitch-hover::before,
+.cyber-btn-text.cyber-btn-glitch-hover::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max-content;
+  transform: translate(-50%, -50%);
+  height: auto;
+  opacity: 0.75;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.cyber-btn-text.cyber-btn-glitch-hover::before {
+  color: #00ffea;
+  animation: cyberBtnGhostCyanHover 0.35s steps(2, end) infinite;
+  clip-path: inset(0 0 55% 0);
+}
+
+.cyber-btn-text.cyber-btn-glitch-hover::after {
+  color: #ff2a6d;
+  animation: cyberBtnGhostMagentaHover 0.35s steps(2, end) infinite;
+  clip-path: inset(45% 0 0 0);
+}
+
+@keyframes cyberBtnGhostCyanHover {
+  0%, 100% { transform: translate(calc(-50% - 0px), -50%); opacity: 0.5; }
+  50% { transform: translate(calc(-50% - 3px), -50%); opacity: 0.85; }
+}
+
+@keyframes cyberBtnGhostMagentaHover {
+  0%, 100% { transform: translate(calc(-50% - 0px), -50%); opacity: 0.5; }
+  50% { transform: translate(calc(-50% + 3px), -50%); opacity: 0.85; }
+}
+
+.cyber-btn-text.cyber-btn-glitch-pulse {
+  animation: cyberBtnTextGlitch 0.45s steps(3, end) 1;
+}
+
+.cyber-btn-text.cyber-btn-glitch-pulse::before,
+.cyber-btn-text.cyber-btn-glitch-pulse::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max-content;
+  transform: translate(-50%, -50%);
+  height: auto;
+  opacity: 0.75;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.cyber-btn-text.cyber-btn-glitch-pulse::before {
+  color: #00ffea;
+  animation: cyberBtnGhostCyanPulse 0.4s steps(2, end) 1;
+  clip-path: inset(0 0 55% 0);
+}
+
+.cyber-btn-text.cyber-btn-glitch-pulse::after {
+  color: #ff2a6d;
+  animation: cyberBtnGhostMagentaPulse 0.4s steps(2, end) 1;
+  clip-path: inset(45% 0 0 0);
+}
+
+@keyframes cyberBtnGhostCyanPulse {
+  0% { transform: translate(calc(-50% - 0px), -50%); opacity: 0.5; }
+  50% { transform: translate(calc(-50% - 3px), -50%); opacity: 0.9; }
+  100% { transform: translate(calc(-50% - 0px), -50%); opacity: 0; }
+}
+
+@keyframes cyberBtnGhostMagentaPulse {
+  0% { transform: translate(calc(-50% - 0px), -50%); opacity: 0.5; }
+  50% { transform: translate(calc(-50% + 3px), -50%); opacity: 0.9; }
+  100% { transform: translate(calc(-50% - 0px), -50%); opacity: 0; }
+}
+
+@keyframes cyberBtnTextGlitch {
+  0%, 100% { transform: translate(0); }
+  20% { transform: translate(-2px, 1px); }
+  40% { transform: translate(2px, -1px); }
+  60% { transform: translate(-1px, -1px); }
+  80% { transform: translate(1px, 1px); }
+}
+
+@keyframes cyberBtnGhostCyan {
+  0%, 100% { transform: translate(calc(-50% - 0px), -50%); opacity: 0.5; }
+  50% { transform: translate(calc(-50% - 3px), -50%); opacity: 0.85; }
+}
+
+@keyframes cyberBtnGhostMagenta {
+  0%, 100% { transform: translate(calc(-50% - 0px), -50%); opacity: 0.5; }
+  50% { transform: translate(calc(-50% + 3px), -50%); opacity: 0.85; }
+}
+
+.cyber-btn-scanline {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent 40%, rgba(0, 255, 255, 0.12) 50%, transparent 60%);
+  transform: translateY(-100%);
+}
+
+.cyber-btn-scanline-hover {
+  opacity: 1;
+  animation: cyberBtnScan 1.2s linear infinite;
+}
+
+.cyber-btn-scanline-pulse {
+  opacity: 1;
+  animation: cyberBtnScan 0.45s linear 1;
+}
+
+@keyframes cyberBtnScan {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+.cyber-glitch.cyber-glitch-hover {
+  display: block;
+  animation: cyberGlitchAnim 0.45s steps(3, end) infinite;
+}
+
+.cyber-glitch.cyber-glitch-pulse {
+  display: block;
+  animation: cyberGlitchAnim 0.45s steps(3, end) 1;
+}
+
+.cyber-navbar-glitch-pulse {
+  animation: cyberNavbarJitter 0.45s steps(2, end) 1;
+}
+
+.cyber-controls-glitch-pulse {
+  animation: cyberNavbarJitter 0.45s steps(2, end) 1;
+}
+
+@keyframes cyberNavbarJitter {
+  0%, 100% { transform: translate(0); filter: none; }
+  25% { transform: translate(-1px, 0); filter: hue-rotate(8deg); }
+  50% { transform: translate(1px, 1px); }
+  75% { transform: translate(-1px, -1px); filter: hue-rotate(-6deg); }
+}
+
+/* --- Circuit Breaker / Light Switch --- */
+
+.cyber-power-unit,
+.cyber-lang-unit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.cyber-power-label,
+.cyber-lang-label {
+  font-family: ui-monospace, monospace;
+  font-size: 7px;
+  letter-spacing: 0.18em;
+  color: rgba(34, 211, 238, 0.55);
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+html.light .cyber-power-label,
+html.light .cyber-lang-label {
+  color: rgba(8, 145, 178, 0.7);
+}
+
+.cyber-breaker {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.cyber-breaker-housing {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 6px;
+  background: linear-gradient(180deg, #1e2433 0%, #0c1018 100%);
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  clip-path: polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 4px 100%, 0 calc(100% - 4px));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+html.light .cyber-breaker-housing {
+  background: linear-gradient(180deg, #e2e8f0 0%, #cbd5e1 100%);
+  border-color: rgba(6, 182, 212, 0.45);
+}
+
+.cyber-breaker-screw {
+  position: absolute;
+  top: 50%;
+  width: 3px;
+  height: 3px;
+  margin-top: -1.5px;
+  border-radius: 50%;
+  background: #475569;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.5);
+}
+
+.cyber-breaker-screw-l { left: 2px; }
+.cyber-breaker-screw-r { right: 2px; }
+
+.cyber-breaker-bulb {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.cyber-breaker-bulb-glass {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #334155 0%, #1e293b 70%, #0f172a 100%);
+  border: 1px solid rgba(100, 116, 139, 0.6);
+  transition: background 200ms ease, box-shadow 200ms ease;
+}
+
+.cyber-breaker-bulb-lit .cyber-breaker-bulb-glass {
+  background: radial-gradient(circle at 40% 30%, #fef9c3 0%, #fbbf24 45%, #d97706 100%);
+  border-color: rgba(251, 191, 36, 0.9);
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.8), 0 0 16px rgba(251, 191, 36, 0.4);
+}
+
+.cyber-breaker-bulb-filament {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%;
+  background: transparent;
+  transition: background 200ms ease;
+}
+
+.cyber-breaker-bulb-lit .cyber-breaker-bulb-filament {
+  background: rgba(255, 255, 200, 0.9);
+  box-shadow: 0 0 4px #fff;
+}
+
+.cyber-breaker-track {
+  position: relative;
+  width: 36px;
+  height: 18px;
+  background: #050810;
+  border: 1px solid rgba(34, 211, 238, 0.25);
+  border-radius: 2px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.cyber-breaker-rocker {
+  position: absolute;
+  top: 1px;
+  width: 16px;
+  height: 14px;
+  transition: left 160ms cubic-bezier(0.34, 1.5, 0.64, 1), right 160ms cubic-bezier(0.34, 1.5, 0.64, 1);
+}
+
+.cyber-breaker-rocker-on {
+  left: 2px;
+  right: auto;
+}
+
+.cyber-breaker-rocker-off {
+  left: auto;
+  right: 2px;
+}
+
+.cyber-breaker-rocker-face {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(180deg, #64748b 0%, #334155 100%);
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  clip-path: polygon(1px 0, calc(100% - 1px) 0, 100% 1px, 100% calc(100% - 1px), calc(100% - 1px) 100%, 1px 100%, 0 calc(100% - 1px), 0 1px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  transition: background 160ms ease, box-shadow 160ms ease;
+}
+
+.cyber-breaker-on .cyber-breaker-rocker-face {
+  background: linear-gradient(180deg, #fde68a 0%, #f59e0b 100%);
+  border-color: rgba(251, 191, 36, 0.8);
+  box-shadow: 0 0 6px rgba(251, 191, 36, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.cyber-breaker-markers {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-family: ui-monospace, monospace;
+  font-size: 6px;
+  letter-spacing: 0.05em;
+  color: rgba(100, 116, 139, 0.7);
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.cyber-breaker-marker-active {
+  color: #22d3ee;
+  text-shadow: 0 0 4px rgba(34, 211, 238, 0.5);
+}
+
+.cyber-breaker-on .cyber-breaker-marker-active {
+  color: #fbbf24;
+  text-shadow: 0 0 4px rgba(251, 191, 36, 0.5);
+}
+
+html.light .cyber-breaker-markers {
+  color: rgba(71, 85, 105, 0.7);
+}
+
+html.light .cyber-breaker-marker-active {
+  color: #0891b2;
+  text-shadow: none;
+}
+
+html.light .cyber-breaker-on .cyber-breaker-marker-active {
+  color: #d97706;
+}
+
+/* --- Lang Toggle --- */
+
+.cyber-lang-toggle {
+  display: flex;
+  clip-path: polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 4px 100%, 0 calc(100% - 4px));
+  border: 1px solid rgba(34, 211, 238, 0.3);
+  overflow: hidden;
+}
+
+.cyber-lang-dark {
+  background: #0a0f18;
+}
+
+.cyber-lang-light {
+  background: #f1f5f9;
+  border-color: rgba(6, 182, 212, 0.4);
+}
+
+.cyber-lang-btn {
+  position: relative;
+  padding: 4px 10px;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: rgba(148, 163, 184, 0.8);
+  transition: color 150ms ease, background 150ms ease;
+}
+
+.cyber-lang-light .cyber-lang-btn {
+  color: rgba(71, 85, 105, 0.8);
+}
+
+.cyber-lang-btn + .cyber-lang-btn {
+  border-left: 1px solid rgba(34, 211, 238, 0.2);
+}
+
+.cyber-lang-light .cyber-lang-btn + .cyber-lang-btn {
+  border-left-color: rgba(6, 182, 212, 0.25);
+}
+
+.cyber-lang-btn:hover {
+  color: #22d3ee;
+  background: rgba(34, 211, 238, 0.08);
+}
+
+.cyber-lang-active {
+  color: #22d3ee !important;
+  background: rgba(34, 211, 238, 0.15) !important;
+  text-shadow: 0 0 8px rgba(34, 211, 238, 0.4);
+}
+
+.cyber-lang-light .cyber-lang-active {
+  color: #0891b2 !important;
+  background: rgba(6, 182, 212, 0.15) !important;
+  text-shadow: none;
+}
+
+.cyber-lang-btn-text {
+  position: relative;
+  z-index: 1;
+}
+
+.cyber-lang-cursor {
+  display: inline-block;
+  margin-left: 1px;
+  animation: cyberLangBlink 1s step-end infinite;
+  color: #22d3ee;
+}
+
+@keyframes cyberLangBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* --- Cyber Scrollbar: sayfa geneli terminal temalı scrollbar --- */
+
+html {
+  scrollbar-width: thin;
+  scrollbar-color: #ec4899 #060910;
+}
+
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: #060910;
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    transparent 7px,
+    rgba(34, 211, 238, 0.07) 7px,
+    rgba(34, 211, 238, 0.07) 8px
+  );
+  border-left: 1px solid rgba(34, 211, 238, 0.18);
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 0;
+  background: linear-gradient(180deg, #ec4899 0%, #f97316 55%, #fbbf24 100%);
+  border: 2px solid #060910;
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.35);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #f472b6 0%, #fb923c 55%, #fcd34d 100%);
+}
+
+::-webkit-scrollbar-corner {
+  background: #060910;
+}
+
+html.light {
+  scrollbar-color: #db2777 #e2ecf7;
+}
+
+html.light ::-webkit-scrollbar-track {
+  background-color: #e2ecf7;
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    transparent 7px,
+    rgba(14, 116, 144, 0.1) 7px,
+    rgba(14, 116, 144, 0.1) 8px
+  );
+  border-left: 1px solid rgba(6, 182, 212, 0.3);
+}
+
+html.light ::-webkit-scrollbar-thumb {
+  border-color: #e2ecf7;
+}
+
+html.light ::-webkit-scrollbar-corner {
+  background: #e2ecf7;
+}
+
+/* İç paneller (modal, chatbot) için ince cyber scrollbar */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(34, 211, 238, 0.65) rgba(6, 9, 16, 0.6);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(6, 9, 16, 0.6);
+  background-image: none;
+  border-left: 1px solid rgba(34, 211, 238, 0.12);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: 0;
+  border: none;
+  background: linear-gradient(180deg, rgba(34, 211, 238, 0.85), rgba(236, 72, 153, 0.85));
+  box-shadow: 0 0 8px rgba(34, 211, 238, 0.35);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #22d3ee, #ec4899);
+}
+
+/* --- Cyber launcher (chatbot robot butonu) --- */
+
+@keyframes cyberBotPing {
+  0% { transform: scale(1); opacity: 0.55; }
+  70%, 100% { transform: scale(1.45); opacity: 0; }
+}
+
+@keyframes cyberBotEyeBlink {
+  0%, 92%, 100% { opacity: 1; }
+  95% { opacity: 0.15; }
 }
 
 
