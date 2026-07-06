@@ -2,6 +2,8 @@ import { motion, AnimatePresence } from "framer-motion"
 import { useEffect } from "react"
 import { createPortal } from "react-dom"
 import { X } from "lucide-react"
+import CyberLangToggle from "../ui/CyberLangToggle"
+import CyberPowerSwitch from "../ui/CyberPowerSwitch"
 import type { Language, Theme } from "../../App"
 
 type Props = {
@@ -28,23 +30,14 @@ export default function MobileMenu({
     tr: {
       home: "Ana Sayfa",
       products: "Ürünler",
-      platform: "API Katmanı",
       about: "Hakkımızda",
       contact: "İletişim",
-      mode: "Mod"
-      ,
-      light: "Açık",
-      dark: "Koyu"
     },
     en: {
       home: "Home",
       products: "Products",
-      platform: "API Layer",
       about: "About",
       contact: "Contact",
-      mode: "Mode",
-      light: "Light",
-      dark: "Dark"
     }
   }[language]
 
@@ -70,13 +63,7 @@ export default function MobileMenu({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="
-            fixed inset-0 
-            bg-black/40 
-            backdrop-blur-md 
-            backdrop-saturate-150 
-            z-[999999]
-          "
+          className="fixed inset-0 bg-black/50 backdrop-blur-md backdrop-saturate-150 z-[999999]"
           onClick={onClose}
         >
           <motion.div
@@ -85,81 +72,58 @@ export default function MobileMenu({
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.25 }}
             onClick={(e) => e.stopPropagation()}
-            className={`absolute top-16 mx-auto left-0 right-0 w-[92%] rounded-3xl border border-cyan-400/20 backdrop-blur-xl p-4 space-y-3 shadow-xl relative ${
+            className={`absolute top-20 mx-auto left-0 right-0 w-[92%] border border-cyan-400/25 backdrop-blur-xl p-4 space-y-3 shadow-xl relative ${
               isLight
-                ? "bg-gradient-to-br from-white/90 via-cyan-100/80 to-white/90"
-                : "bg-gradient-to-br from-slate-900/80 via-purple-900/60 to-slate-900/80"
+                ? "bg-gradient-to-br from-white/95 via-cyan-50/90 to-white/95"
+                : "bg-gradient-to-br from-slate-900/95 via-slate-950/90 to-slate-900/95"
             }`}
+            style={{ clipPath: 'polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px))' }}
           >
+            {/* Üst şerit: solda LANG + IŞIK, sağda kapatma butonu */}
+            <div className="flex items-center justify-between gap-3 pb-3 border-b border-cyan-500/15">
+              <div className="flex items-center gap-4">
+                <CyberLangToggle
+                  language={language}
+                  onLanguageChange={onLanguageChange}
+                  theme={theme}
+                />
+                <CyberPowerSwitch theme={theme} language={language} onToggle={onThemeToggle} />
+              </div>
 
-            {/* X */}
-            <button
-              onClick={onClose}
-              className={`absolute -top-4 -right-4 h-10 w-10 flex items-center justify-center rounded-full border transition backdrop-blur-md z-10 hover:text-red-400 ${
-                isLight
-                  ? "bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-700"
-                  : "bg-white/10 hover:bg-white/20 border-white/20 text-white/80"
-              }`}
-            >
-              <X size={20} />
-            </button>
-
-            <div className="flex items-center gap-2">
-              <select
-                value={language}
-                onChange={(e) => onLanguageChange(e.target.value as Language)}
-                className={`w-1/2 rounded-xl border px-3 py-2 text-sm ${
-                  isLight
-                    ? "bg-white text-slate-800 border-cyan-200"
-                    : "bg-slate-900/80 text-white border-cyan-500/30"
-                }`}
-              >
-                <option value="tr">TR</option>
-                <option value="en">EN</option>
-              </select>
               <button
-                onClick={onThemeToggle}
-                className={`w-1/2 rounded-xl border px-3 py-2 text-sm font-medium transition ${
+                onClick={onClose}
+                className={`h-9 w-9 flex-shrink-0 flex items-center justify-center border transition hover:text-red-400 ${
                   isLight
-                    ? "bg-white text-slate-800 border-cyan-200 hover:bg-slate-100"
-                    : "bg-slate-900/80 text-cyan-200 border-cyan-500/30 hover:bg-slate-800"
+                    ? "bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-700"
+                    : "bg-slate-900/90 hover:bg-slate-800 border-cyan-500/30 text-cyan-200"
                 }`}
+                style={{ clipPath: 'polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 4px 100%, 0 calc(100% - 4px))' }}
+                aria-label="Close menu"
               >
-                {labels.mode}: {isLight ? labels.light : labels.dark}
+                <X size={18} />
               </button>
             </div>
 
-            {/* MENU BUTTON */}
             {[
               { id: 'home', text: labels.home },
               { id: 'products', text: labels.products },
-              { id: 'platform', text: labels.platform },
               { id: 'about', text: labels.about },
               { id: 'contact', text: labels.contact },
             ].map((item, idx) => (
               <button
                 key={idx}
                 onClick={() => go(item.id)}
-                className={`relative overflow-hidden w-full px-5 py-3 rounded-xl text-left transition-all duration-200 active:scale-[0.97] active:shadow-[0_0_12px_rgba(255,255,255,0.2)] ${
+                className={`relative overflow-hidden w-full px-5 py-3 text-left font-mono text-sm uppercase tracking-widest transition-all duration-200 active:scale-[0.98] ${
                   isLight
-                    ? "bg-slate-200 text-slate-800 hover:bg-slate-300 active:bg-slate-400"
-                    : "bg-white/10 text-white hover:bg-white/20 active:bg-white/30"
+                    ? "bg-slate-100 text-slate-800 hover:bg-slate-200 border border-cyan-200/60"
+                    : "bg-slate-900/60 text-cyan-200 hover:bg-slate-800/80 border border-cyan-500/20"
                 }`}
+                style={{ clipPath: 'polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px))' }}
               >
-                {/* RIPPLE */}
-                <span
-                  className="
-                    absolute inset-0 opacity-0
-                    active:animate-[pulse_0.4s_ease-out]
-                    rounded-xl
-                    bg-white/40
-                  "
-                ></span>
-
+                <span className="text-cyan-500/50 mr-2">{`>`}</span>
                 {item.text}
               </button>
             ))}
-
           </motion.div>
         </motion.div>
       )}

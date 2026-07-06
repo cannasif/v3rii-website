@@ -1,9 +1,11 @@
-import { motion, AnimatePresence } from 'framer-motion'
-import { Globe, Menu, Moon, Sun, X, ChevronDown } from 'lucide-react' // ChevronDown eklendi
+import { motion } from 'framer-motion'
+import { Menu, X } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import MobileMenu from './MobileMenu'
 import { useScrollToSection } from '../../hooks/useScrollToSection'
 import CyberButton from '../ui/CyberButton'
+import CyberLangToggle from '../ui/CyberLangToggle'
+import CyberPowerSwitch from '../ui/CyberPowerSwitch'
 import logoImage from '../../assets/logo-20260329.png'
 import type { Language, Theme } from '../../App'
 
@@ -17,21 +19,16 @@ type Props = {
 export default function Navbar({ language, onLanguageChange, theme, onThemeToggle }: Props) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
-  const [isLangMenuOpen, setIsLangMenuOpen] = useState(false) // Özel dil menüsü için state
-  
-  const scrollToSection = useScrollToSection(80)
+
+  const scrollToSection = useScrollToSection(scrolled ? 80 : 120)
   const isLight = theme === 'light'
   const navText = {
-    tr: { home: 'Ana Sayfa', products: 'Ürünler', platform: 'API Katmanı', about: 'Hakkımızda', contact: 'İletişim' },
-    en: { home: 'Home', products: 'Products', platform: 'API Layer', about: 'About', contact: 'Contact' }
+    tr: { home: 'Ana Sayfa', products: 'Ürünler', about: 'Hakkımızda', contact: 'İletişim' },
+    en: { home: 'Home', products: 'Products', about: 'About', contact: 'Contact' }
   }[language]
 
   useEffect(() => {
-    const handleScroll = () => {
-      if (window.scrollY > 20) setScrolled(true)
-      else setScrolled(false)
-    }
-
+    const handleScroll = () => setScrolled(window.scrollY > 20)
     window.addEventListener('scroll', handleScroll)
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
@@ -39,146 +36,98 @@ export default function Navbar({ language, onLanguageChange, theme, onThemeToggl
   return (
     <nav
       className={`
-        fixed top-0 left-0 right-0 z-50 transition-all duration-500
-        ${scrolled ? (isLight ? 'bg-white/80 backdrop-blur-xl border-b border-cyan-200/60' : 'bg-slate-900/60 backdrop-blur-xl') : 'bg-transparent'}
+        cyber-navbar fixed top-0 left-0 right-0 z-50 transition-all duration-300 pt-1.5
+        ${scrolled
+          ? isLight ? 'cyber-navbar-scrolled-light' : 'cyber-navbar-scrolled-dark'
+          : 'bg-transparent'
+        }
       `}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 lg:py-6">
-        <div className="relative flex items-center justify-between">
+      <div className="cyber-navbar-scanline" aria-hidden="true" />
 
-          {/* LEFT BUTTONS */}
-          <motion.div
-            initial={{ opacity: 0, x: -50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.1 }}
-            className="hidden lg:flex space-x-3"
-          >
+      <div className="w-full px-4 sm:px-6">
+        {/*
+          Sabit yükseklikli şerit: logo PNG'sinin şeffaf kenarları satırı şişirmesin diye
+          logo absolute olarak satırın ortasına oturur, taşan kısım şeffaf olduğu için görünmez.
+        */}
+        <div className="hidden lg:grid lg:grid-cols-[1fr_auto_1fr] lg:items-center lg:gap-3 h-16 lg:h-[4.5rem]">
+
+          <div className="flex items-center gap-2 justify-self-start relative z-10">
             <CyberButton scrolled={scrolled} theme={theme} onClick={() => scrollToSection('home')}>
               {navText.home}
             </CyberButton>
-
             <CyberButton scrolled={scrolled} theme={theme} onClick={() => scrollToSection('products')}>
               {navText.products}
             </CyberButton>
+          </div>
 
-            <CyberButton scrolled={scrolled} theme={theme} onClick={() => scrollToSection('platform')}>
-              {navText.platform}
-            </CyberButton>
-          </motion.div>
-
-          {/* LOGO */}
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            whileHover={{ scale: 1.04, y: -2 }}
-            className="logo-hover-fx absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center"
+          <motion.button
+            type="button"
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.98 }}
+            className="logo-hover-fx relative z-30 h-full w-48 lg:w-56 cursor-pointer bg-transparent border-0 p-0 m-0 justify-self-center"
+            onClick={() => scrollToSection('home')}
+            aria-label="V3RII Home"
           >
-            <img
-              src={logoImage}
-              alt="V3RII Logo"
-              className="logo-hover-image h-36 sm:h-40 lg:h-48 xl:h-56 object-contain"
-            />
-            <img src={logoImage} alt="" aria-hidden="true" className="logo-glitch-layer logo-glitch-cyan absolute inset-0 h-full w-full object-contain" />
-            <img src={logoImage} alt="" aria-hidden="true" className="logo-glitch-layer logo-glitch-red absolute inset-0 h-full w-full object-contain" />
-          </motion.div>
+            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 block leading-none">
+              <img
+                src={logoImage}
+                alt="V3RII Logo"
+                className={`logo-hover-image block w-auto max-w-none object-contain pointer-events-none transition-all duration-300 ${scrolled ? 'h-24 lg:h-28' : 'h-40 lg:h-48'}`}
+              />
+              <img src={logoImage} alt="" aria-hidden="true" className="logo-glitch-layer logo-glitch-cyan absolute inset-0 h-full w-full object-contain pointer-events-none" />
+              <img src={logoImage} alt="" aria-hidden="true" className="logo-glitch-layer logo-glitch-red absolute inset-0 h-full w-full object-contain pointer-events-none" />
+            </span>
+          </motion.button>
 
-          {/* RIGHT SIDE */}
-          <motion.div
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.1 }}
-            className="hidden lg:flex items-center gap-3 lg:absolute lg:right-0 lg:top-1/2 lg:-translate-y-1/2"
-          >
+          <div className="flex items-center gap-2 justify-self-end relative z-10">
             <CyberButton scrolled={scrolled} theme={theme} onClick={() => scrollToSection('about')}>
               {navText.about}
             </CyberButton>
-
             <CyberButton scrolled={scrolled} theme={theme} onClick={() => scrollToSection('contact')}>
               {navText.contact}
             </CyberButton>
-
-            {/* --- ÖZEL TASARIM DİL SEÇİCİ --- */}
-            <div className="relative">
-              {/* Menü açıkken dışarı tıklanırsa kapanması için görünmez alan */}
-              {isLangMenuOpen && (
-                <div 
-                  className="fixed inset-0 z-40" 
-                  onClick={() => setIsLangMenuOpen(false)} 
-                />
-              )}
-              
-              <button
-                onClick={() => setIsLangMenuOpen(!isLangMenuOpen)}
-                className={`relative z-50 flex items-center gap-2 rounded-xl border px-3 py-2 transition-all duration-300 ${
-                  isLight 
-                    ? 'bg-white border-cyan-200 text-slate-700 hover:bg-slate-50' 
-                    : 'bg-slate-900/70 border-cyan-500/30 text-cyan-200 hover:bg-slate-800 hover:border-cyan-400/50 hover:shadow-[0_0_10px_rgba(34,211,238,0.2)]'
-                }`}
-              >
-                <Globe size={16} className={isLangMenuOpen ? "text-cyan-400" : ""} />
-                <span className="text-sm font-bold uppercase tracking-wider">{language}</span>
-                <ChevronDown size={14} className={`transition-transform duration-300 ${isLangMenuOpen ? 'rotate-180 text-cyan-400' : ''}`} />
-              </button>
-
-              <AnimatePresence>
-                {isLangMenuOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                    transition={{ duration: 0.15 }}
-                    className={`absolute top-full right-0 mt-2 w-24 rounded-xl border overflow-hidden shadow-xl z-50 ${
-                      isLight 
-                        ? 'bg-white border-cyan-200' 
-                        : 'bg-[#0a0f1a]/95 backdrop-blur-md border-cyan-500/30 shadow-[0_0_15px_rgba(0,255,255,0.1)]'
-                    }`}
-                  >
-                    {['tr', 'en'].map((lang) => (
-                      <button
-                        key={lang}
-                        onClick={() => {
-                          onLanguageChange(lang as Language);
-                          setIsLangMenuOpen(false); // Seçimden sonra menüyü kapat
-                        }}
-                        className={`w-full text-left px-4 py-2.5 text-sm uppercase tracking-wider transition-colors duration-200 flex items-center gap-2 ${
-                          language === lang 
-                            ? (isLight ? 'bg-cyan-50 text-cyan-700 font-bold' : 'bg-cyan-500/20 text-cyan-400 font-bold border-l-2 border-cyan-400') 
-                            : (isLight ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-300 hover:bg-slate-800 hover:text-cyan-200 border-l-2 border-transparent')
-                        }`}
-                      >
-                        {lang}
-                      </button>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+            {/* Akış içinde: dar ekranda butonların altına binmez, yer kaplar */}
+            <div className="cyber-navbar-controls ml-2">
+              <CyberLangToggle language={language} onLanguageChange={onLanguageChange} theme={theme} />
+              <span className="cyber-navbar-divider" aria-hidden="true" />
+              <CyberPowerSwitch theme={theme} language={language} onToggle={onThemeToggle} />
             </div>
-            {/* --- ÖZEL TASARIM DİL SEÇİCİ BİTTİ --- */}
-
-            <button
-              onClick={onThemeToggle}
-              className={`rounded-xl border p-2 transition ${isLight ? 'bg-white border-cyan-200 text-slate-700 hover:bg-slate-100' : 'bg-slate-900/70 border-cyan-500/30 text-cyan-200 hover:bg-slate-800'}`}
-              aria-label="Toggle theme"
-            >
-              {isLight ? <Moon size={18} /> : <Sun size={18} />}
-            </button>
-          </motion.div>
-
-          {/* MOBILE MENU BUTTON */}
-          <motion.button
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className={`lg:hidden p-2 ${isLight ? 'text-slate-800' : 'text-white/90'}`}
-          >
-            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </motion.button>
-
+          </div>
         </div>
 
-        {/* MOBILE MENU */}
+        {/* Mobile */}
+        <div className="flex lg:hidden items-center justify-between h-14">
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.97 }}
+            className="logo-hover-fx relative z-30 h-full w-36 cursor-pointer bg-transparent border-0 p-0 m-0"
+            onClick={() => scrollToSection('home')}
+            aria-label="V3RII Home"
+          >
+            {/* Sola hizalı: geniş PNG ekranın soluna taşıp kırpılmasın */}
+            <span className="absolute left-0 top-1/2 -translate-y-1/2 block leading-none">
+              <img
+                src={logoImage}
+                alt="V3RII Logo"
+                className={`logo-hover-image block w-auto max-w-none object-contain pointer-events-none transition-all duration-300 ${scrolled ? 'h-20' : 'h-24'}`}
+              />
+              <img src={logoImage} alt="" aria-hidden="true" className="logo-glitch-layer logo-glitch-cyan absolute inset-0 h-full w-full object-contain pointer-events-none" />
+              <img src={logoImage} alt="" aria-hidden="true" className="logo-glitch-layer logo-glitch-red absolute inset-0 h-full w-full object-contain pointer-events-none" />
+            </span>
+          </motion.button>
+
+          {/* Mobilde LANG + IŞIK hamburger menüsünün içinde */}
+          <motion.button
+            whileTap={{ scale: 0.92 }}
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className={`cyber-mobile-toggle relative z-30 p-2 ${isLight ? 'text-slate-800' : 'text-cyan-300'}`}
+            aria-label="Toggle menu"
+          >
+            {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </motion.button>
+        </div>
+
         <MobileMenu
           isOpen={isMobileMenuOpen}
           onClose={() => setIsMobileMenuOpen(false)}
@@ -188,7 +137,6 @@ export default function Navbar({ language, onLanguageChange, theme, onThemeToggl
           onLanguageChange={onLanguageChange}
           onThemeToggle={onThemeToggle}
         />
-
       </div>
     </nav>
   )
