@@ -5,7 +5,7 @@
 Frontend build sırasında API adresini ver:
 
 ```bash
-VITE_V3RII_API_BASE_URL=https://api.v3rii.com npm run build
+VITE_V3RII_API_BASE_URL=https://veriiapi.v3rii.com npm run build
 ```
 
 Jenkinsfile aynı değeri `VITE_V3RII_API_BASE_URL` build parametresi olarak alır.
