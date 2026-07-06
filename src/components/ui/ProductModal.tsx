@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronRight, Terminal, Cpu, Network, SlidersHorizontal, Layers3 } from "lucide-react"; 
 import type { Language, Theme } from "../../App";
@@ -46,6 +48,35 @@ export default function ProductModal({ product, onClose, language, theme }: Prod
     },
   }[language];
 
+  // ESC tuşu ile kapatma + modal açıkken sayfa scroll'unu kilitle
+  useEffect(() => {
+    if (!product) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+
+    // Asıl kayan eleman html olduğu için kilidi hem html'e hem body'ye uygula
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    const previousBodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      document.body.style.overflow = previousBodyOverflow;
+    };
+  }, [product, onClose]);
+
+  // Yüzen butonlar (Yukarı Çık, AI asistan) modal açıkken gizlensin
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("v3rii-product-modal-toggle", { detail: { open: Boolean(product) } }));
+    return () => {
+      window.dispatchEvent(new CustomEvent("v3rii-product-modal-toggle", { detail: { open: false } }));
+    };
+  }, [product]);
+
   // Sisteme gitmek için fonksiyon (bir önceki güncellemeden)
   const handleLaunchSystem = () => {
     if (product?.link) {
@@ -55,17 +86,17 @@ export default function ProductModal({ product, onClose, language, theme }: Prod
     }
   };
 
-  return (
+  // Portal: Products section içindeki transform'lu sarmalayıcılar fixed konumlandırmayı
+  // bozduğu için modal doğrudan body altına render edilir (blur tüm sayfayı kaplar)
+  return createPortal(
     <AnimatePresence>
       {product && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          // 🔥 DEĞİŞİKLİK BURADA: bg-black/60 yerine bg-transparent yapıldı.
-          // 🔥 backdrop-blur-[4px] korundu ki arkadaki detaylar modalı yormasın.
-          className={`fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 backdrop-blur-[4px] ${
-            isLight ? "bg-white/20" : "bg-black/20"
+          className={`fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 backdrop-blur-[10px] ${
+            isLight ? "bg-white/40" : "bg-black/45"
           }`}
           onClick={onClose} // Arka plana tıklayınca kapanır
         >
@@ -75,7 +106,7 @@ export default function ProductModal({ product, onClose, language, theme }: Prod
             exit={{ scale: 0.95, y: 20, opacity: 0 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
             onClick={(e) => e.stopPropagation()} // Modal içine tıklayınca kapanmasın
-            className={`relative flex h-[calc(100vh-1.5rem)] w-full max-w-7xl flex-col overflow-hidden border border-pink-500/30 shadow-[0_0_50px_rgba(219,39,119,0.2)] sm:h-[min(820px,calc(100vh-3rem))] lg:flex-row ${
+            className={`relative flex h-[calc(100vh-1.5rem)] w-full max-w-[84rem] flex-col overflow-hidden border border-pink-500/30 shadow-[0_0_50px_rgba(219,39,119,0.2)] sm:h-[min(900px,calc(100vh-2.5rem))] ${
               isLight ? "bg-white/95" : "bg-[#0a0f1a]/95" // Modalın kendi arka planı korundu
             }`}
             style={{ 
@@ -85,16 +116,19 @@ export default function ProductModal({ product, onClose, language, theme }: Prod
             {/* KAPATMA BUTONU */}
             <button 
               onClick={onClose} 
-              className={`absolute top-2 right-2 sm:top-4 sm:right-4 z-50 p-2 text-pink-500 border border-pink-500/30 backdrop-blur-sm hover:bg-pink-500 hover:text-white transition-all ${
+              className={`absolute top-2 right-2 sm:top-4 sm:right-4 z-[60] p-2 text-pink-500 border border-pink-500/30 backdrop-blur-sm hover:bg-pink-500 hover:text-white transition-all ${
                 isLight ? "bg-white/80" : "bg-black/70"
               }`}
             >
               <X className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
 
+            {/* Mobilde tüm modal tek parça kaydırılır; masaüstünde sağ panel kendi içinde kayar */}
+            <div className="custom-scrollbar flex min-h-0 w-full flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
+
             {/* SOL KISIM */}
             <div 
-              className={`relative flex h-[230px] w-full shrink-0 items-center justify-center overflow-hidden border-b border-pink-500/30 lg:h-full lg:w-5/12 lg:border-b-0 lg:border-r ${
+              className={`relative flex h-[280px] w-full shrink-0 items-center justify-center overflow-hidden border-b border-pink-500/30 sm:h-[340px] lg:h-auto lg:min-h-0 lg:w-5/12 lg:self-stretch lg:border-b-0 lg:border-r ${
                 isLight ? "bg-slate-100" : "bg-black"
               }`}
             >
@@ -108,7 +142,7 @@ export default function ProductModal({ product, onClose, language, theme }: Prod
                 <img
                   src={heroImage}
                   alt={`${product.title} preview`}
-                  className={`absolute inset-0 h-full w-full object-cover ${isLight ? "opacity-75" : "opacity-52"}`}
+                  className={`absolute inset-0 h-full w-full object-cover ${isLight ? "opacity-75" : "opacity-[0.55]"}`}
                 />
               ) : null}
 
@@ -160,10 +194,10 @@ export default function ProductModal({ product, onClose, language, theme }: Prod
             </div>
 
             {/* SAĞ KISIM: BİLGİLER */}
-            <div className={`relative flex min-h-0 w-full flex-1 flex-col overflow-hidden lg:w-7/12 ${
+            <div className={`relative flex w-full flex-col lg:min-h-0 lg:w-7/12 lg:flex-1 lg:overflow-hidden ${
               isLight ? "bg-gradient-to-br from-white to-cyan-50" : "bg-gradient-to-br from-[#0a0f1a] to-[#120a1a]"
             }`}>
-              <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto p-5 pr-4 sm:p-8 sm:pr-6 lg:p-10 lg:pr-8">
+              <div className="p-5 pr-4 sm:p-8 sm:pr-6 lg:custom-scrollbar lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:p-10 lg:pr-8">
                 <div className="flex items-center gap-2 mb-4">
                   <Terminal className="w-4 h-4 sm:w-5 sm:h-5 text-pink-500" />
                   <span className="text-pink-500 font-cyber tracking-[0.2em] uppercase text-[10px] sm:text-xs border-b border-pink-500/30 pb-1">
@@ -232,15 +266,19 @@ export default function ProductModal({ product, onClose, language, theme }: Prod
 
               <button 
                 onClick={handleLaunchSystem} // Link fonksiyonu
-                className="m-5 mt-0 flex shrink-0 items-center justify-center gap-2 bg-pink-600 py-3 text-xs font-bold uppercase tracking-[0.2em] text-white shadow-[0_0_20px_rgba(219,39,119,0.3)] transition-all hover:bg-pink-500 sm:m-8 sm:mt-0 sm:py-4 sm:text-sm"
+                className="group relative m-5 mt-0 flex shrink-0 items-center justify-center gap-2 overflow-hidden bg-gradient-to-r from-pink-600 via-orange-500 to-amber-400 py-3.5 font-cyber text-xs font-bold uppercase tracking-[0.25em] text-white shadow-[0_0_20px_rgba(219,39,119,0.35)] transition-all duration-300 hover:shadow-[0_0_36px_rgba(219,39,119,0.55)] sm:m-8 sm:mt-0 sm:py-4 sm:text-sm"
+                style={{ clipPath: 'polygon(2.5% 0, 100% 0, 100% 65%, 97.5% 100%, 0 100%, 0 35%)' }}
               >
+                <span className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
                 {text.launch}
                 <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </button>
             </div>
+            </div>
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
