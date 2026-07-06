@@ -21,6 +21,12 @@ export type ChatMessage = {
   sender: ChatSender
   text: string
   meta?: string
+  cards?: ChatMessageCard[]
+}
+
+export type ChatMessageCard = {
+  title: string
+  body: string
 }
 
 export type ProductKnowledge = {
@@ -56,4 +62,15 @@ export type SupportRequestPayload = Required<Pick<SupportLead, 'name' | 'email' 
 export type SupportRequestResult = {
   success: boolean
   message: string
+  ticketNo?: string
+}
+
+export type KnowledgeArticle = {
+  id: number
+  product: 'Crm' | 'B2B' | 'Wms' | 'Uts'
+  title: string
+  summary: string
+  contentMarkdown: string
+  tags: string
+  isPublished: boolean
 }

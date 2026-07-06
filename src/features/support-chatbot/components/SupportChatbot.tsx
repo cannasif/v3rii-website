@@ -14,9 +14,10 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Language, Theme } from '../../../App'
-import { sendSupportRequest } from '../api/supportRequestApi'
+import { askKnowledgeBase, sendSupportRequest, trackChatEvent } from '../api/supportRequestApi'
 import type {
   ChatMessage,
+  ChatMessageCard,
   SupportIntent,
   SupportLanguage,
   SupportLead,
@@ -171,6 +172,7 @@ export default function SupportChatbot({ language, theme }: Props) {
   const [input, setInput] = useState('')
   const [isSending, setIsSending] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const sessionIdRef = useRef(createId())
   const t = text[lead.language]
   const isLight = theme === 'light'
 
@@ -178,14 +180,20 @@ export default function SupportChatbot({ language, theme }: Props) {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages, isOpen])
 
-  const addMessage = (sender: ChatMessage['sender'], value: string, meta?: string) => {
-    setMessages((prev) => [...prev, { id: createId(), sender, text: value, meta }])
+  useEffect(() => {
+    void trackChatEvent('chat_started', { sessionId: sessionIdRef.current, metadata: { language: initialLanguage } })
+  }, [initialLanguage])
+
+  const addMessage = (sender: ChatMessage['sender'], value: string, meta?: string, cards?: ChatMessageCard[]) => {
+    setMessages((prev) => [...prev, { id: createId(), sender, text: value, meta, cards }])
   }
 
   const reset = (nextLanguage = lead.language) => {
     setStep('product')
     setLead(initialLead(nextLanguage))
     setMessages(createInitialMessages(nextLanguage))
+    sessionIdRef.current = createId()
+    void trackChatEvent('chat_started', { sessionId: sessionIdRef.current, metadata: { language: nextLanguage } })
     setInput('')
     setIsSending(false)
   }
@@ -202,6 +210,36 @@ export default function SupportChatbot({ language, theme }: Props) {
       `${text[activeLanguage].parameters}:\n${product.parameters.map((item) => `- ${item}`).join('\n')}`,
       `${text[activeLanguage].supportTopics}:\n${product.supportTopics.map((item) => `- ${item}`).join('\n')}`
     ].join('\n\n')
+  }
+
+  const createProductCards = (productKey: SupportProductKey, activeLanguage = lead.language): ChatMessageCard[] => {
+    const product = productKnowledge[activeLanguage][productKey]
+    return [
+      { title: text[activeLanguage].productAnswerPrefix, body: product.summary },
+      { title: text[activeLanguage].idealFor, body: product.idealFor },
+      { title: text[activeLanguage].keyFeatures, body: product.features.join('\n') },
+      { title: text[activeLanguage].moduleGroups, body: product.modules.join('\n') },
+      { title: text[activeLanguage].integrations, body: product.integrations.join('\n') },
+      { title: text[activeLanguage].parameters, body: product.parameters.join('\n') },
+      { title: text[activeLanguage].supportTopics, body: product.supportTopics.join('\n') }
+    ]
+  }
+
+  const answerFromKnowledgeBase = async (question: string, product = lead.product, activeLanguage = lead.language) => {
+    try {
+      const result = await askKnowledgeBase(product, question, activeLanguage, sessionIdRef.current)
+      const cards = result.sources.map((source) => ({
+        title: source.title,
+        body: `${source.summary}\n\n${source.contentMarkdown}`
+      }))
+      addMessage('bot', result.answer, result.usedLlm ? 'LLM + RAG' : 'Bilgi tabanı', cards)
+    } catch {
+      if (product) {
+        addMessage('bot', describeProduct(product, activeLanguage), 'offline', createProductCards(product, activeLanguage))
+      } else {
+        addMessage('bot', describePortfolio(activeLanguage))
+      }
+    }
   }
 
   const describePortfolio = (activeLanguage = lead.language) =>
@@ -221,7 +259,8 @@ export default function SupportChatbot({ language, theme }: Props) {
     setLead((prev) => ({ ...prev, product }))
     setStep('intent')
     addMessage('system', t.productSelected, productKnowledge[lead.language][product].title)
-    addMessage('bot', describeProduct(product))
+    addMessage('bot', productKnowledge[lead.language][product].summary, 'knowledge', createProductCards(product))
+    void trackChatEvent('product_selected', { product, sessionId: sessionIdRef.current })
     addMessage('bot', t.askIntent, 'intent')
   }
 
@@ -231,7 +270,7 @@ export default function SupportChatbot({ language, theme }: Props) {
 
     if (intent === 'product-info' && lead.product) {
       setStep('answer')
-      addMessage('bot', describeProduct(lead.product))
+      void answerFromKnowledgeBase(lead.product, lead.product)
       addMessage('bot', t.askIntent, 'intent')
       return
     }
@@ -255,11 +294,13 @@ export default function SupportChatbot({ language, theme }: Props) {
 
     setIsSending(true)
     try {
-      await sendSupportRequest(payload)
-      addMessage('system', t.submitted, 'email')
+      const result = await sendSupportRequest(payload)
+      void trackChatEvent('ticket_created', { product: currentLead.product, intent: currentLead.intent, sessionId: sessionIdRef.current, metadata: { ticketNo: result.ticketNo } })
+      addMessage('system', result.ticketNo ? `${t.submitted}\nTicket: ${result.ticketNo}` : t.submitted, 'ticket')
       setStep('submitted')
     } catch {
       savePendingRequest({ ...currentLead, details }, messages)
+      void trackChatEvent('drop_off', { product: currentLead.product, intent: currentLead.intent, sessionId: sessionIdRef.current, metadata: { reason: 'ticket_submit_failed' } })
       addMessage('system', t.savedOffline, 'pending')
       setStep('submitted')
     } finally {
@@ -299,7 +340,7 @@ export default function SupportChatbot({ language, theme }: Props) {
     switch (step) {
       case 'product':
         if (wantsPortfolio) {
-          addMessage('bot', describePortfolio(detectedLanguage))
+          void answerFromKnowledgeBase(value, undefined, detectedLanguage)
           addMessage('bot', activeText.askProduct, 'product')
           return
         }
@@ -315,7 +356,7 @@ export default function SupportChatbot({ language, theme }: Props) {
           selectIntent(intentFromText)
           return
         }
-        addMessage('bot', activeText.fallback)
+        void answerFromKnowledgeBase(value, lead.product, detectedLanguage)
         break
       case 'collect-name':
         setLead((prev) => ({ ...prev, name: value }))
@@ -465,6 +506,25 @@ export default function SupportChatbot({ language, theme }: Props) {
                       </div>
                     )}
                     {message.text}
+                    {message.cards && message.cards.length > 0 && (
+                      <div className="mt-3 space-y-2">
+                        {message.cards.map((card) => (
+                          <details
+                            key={`${message.id}-${card.title}`}
+                            className={`group rounded-xl border px-3 py-2 ${
+                              isLight ? 'border-cyan-100 bg-white/80' : 'border-cyan-400/15 bg-slate-950/45'
+                            }`}
+                          >
+                            <summary className="cursor-pointer list-none text-xs font-bold uppercase tracking-wide text-cyan-500">
+                              {card.title}
+                            </summary>
+                            <p className={`mt-2 whitespace-pre-line text-xs leading-relaxed ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
+                              {card.body}
+                            </p>
+                          </details>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

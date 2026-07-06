@@ -1,5 +1,15 @@
 # React + TypeScript + Vite
 
+## V3RII API Bağlantısı
+
+Frontend build sırasında API adresini ver:
+
+```bash
+VITE_V3RII_API_BASE_URL=https://api.v3rii.com npm run build
+```
+
+Jenkinsfile aynı değeri `VITE_V3RII_API_BASE_URL` build parametresi olarak alır.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:

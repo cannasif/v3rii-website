@@ -4,6 +4,7 @@ import Footer from './components/layout/Footer'
 import Home from './pages/Home'
 import ScrollToTopButton from './components/ui/ScrollToTopButton'
 import SupportChatbot from './features/support-chatbot/components/SupportChatbot'
+import AdminPanel from './features/admin/components/AdminPanel'
 
 export type Language = 'tr' | 'en'
 export type Theme = 'dark' | 'light'
@@ -40,6 +41,10 @@ function App() {
   // =================================================================
   // YENİ: 404 SAYFASI (Eğer URL ana sayfa '/' değilse bu ekran çıkar)
   // =================================================================
+  if (currentPath === '/admin') {
+    return <AdminPanel theme={theme} />
+  }
+
   if (currentPath !== '/' && currentPath !== '/index.html') {
     return (
       <div className={`min-h-screen flex flex-col items-center justify-center p-4 text-center font-cyber relative overflow-hidden ${
