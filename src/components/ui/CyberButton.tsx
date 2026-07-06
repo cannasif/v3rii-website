@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Props = {
   children: React.ReactNode;
@@ -8,49 +8,80 @@ type Props = {
   theme?: 'dark' | 'light';
 };
 
+const GLITCH_BURST_MS = 450;
+const GLITCH_REPEAT_MS = 5000;
+
 export default function CyberButton({ children, onClick, scrolled = false, theme = 'dark' }: Props) {
-  const [hover, setHover] = useState(false);
+  const [glitching, setGlitching] = useState(false);
+  const burstTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const repeatTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const isLight = theme === 'light';
+
+  const burst = () => {
+    setGlitching(true);
+    if (burstTimer.current) clearTimeout(burstTimer.current);
+    burstTimer.current = setTimeout(() => setGlitching(false), GLITCH_BURST_MS);
+  };
+
+  const handleEnter = () => {
+    burst();
+    repeatTimer.current = setInterval(burst, GLITCH_REPEAT_MS);
+  };
+
+  const handleLeave = () => {
+    if (repeatTimer.current) clearInterval(repeatTimer.current);
+    if (burstTimer.current) clearTimeout(burstTimer.current);
+    repeatTimer.current = null;
+    setGlitching(false);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (repeatTimer.current) clearInterval(repeatTimer.current);
+      if (burstTimer.current) clearTimeout(burstTimer.current);
+    };
+  }, []);
 
   return (
     <motion.button
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      whileHover={{ scale: 1.05, y: -2 }}
+      onMouseEnter={handleEnter}
+      onMouseLeave={handleLeave}
+      whileHover={{ scale: 1.03 }}
+      whileTap={{ scale: 0.98 }}
       onClick={onClick}
       className={`
-        relative group px-6 py-3 rounded-md font-medium transition-all duration-300
-        border border-transparent
-        font-mono font-bold tracking-tight
+        cyber-btn relative group inline-flex items-center justify-center
+        px-5 py-0 min-h-[2.125rem] font-mono font-bold tracking-wider text-xs uppercase
+        transition-all duration-200 border overflow-hidden select-none
         ${scrolled
-          ? "shadow-[0_0_25px_rgba(0,255,255,0.45)] hover:shadow-[0_0_40px_rgba(0,255,255,0.75)]"
+          ? "shadow-[0_0_20px_rgba(0,255,255,0.35)] hover:shadow-[0_0_32px_rgba(0,255,255,0.6)]"
           : "shadow-none"
         }
         ${
           scrolled
             ? isLight
-              ? "bg-gradient-to-b from-white to-cyan-50 text-slate-800 border-cyan-200"
-              : "bg-gradient-to-b from-cyan-900/90 to-indigo-900/90 text-cyan-300"
+              ? "bg-gradient-to-b from-white to-cyan-50/90 text-slate-800 border-cyan-300/70"
+              : "bg-gradient-to-b from-slate-900/95 to-slate-950/95 text-cyan-300 border-cyan-500/40"
             : isLight
-              ? "bg-gradient-to-b from-white/80 to-cyan-50/80 text-slate-800 border-cyan-100"
-              : "bg-gradient-to-b from-slate-900/80 to-slate-800/80 text-cyan-300"
+              ? "bg-gradient-to-b from-white/85 to-cyan-50/70 text-slate-800 border-cyan-200/60"
+              : "bg-gradient-to-b from-slate-900/75 to-slate-950/80 text-cyan-300/95 border-cyan-500/25"
         }
-
-        overflow-hidden select-none
       `}
     >
-      {/* Text */}
-      <span className="relative z-20 group-hover:animate-glitch">
+      <span className="cyber-btn-corner cyber-btn-corner-tl" aria-hidden="true" />
+      <span className="cyber-btn-corner cyber-btn-corner-tr" aria-hidden="true" />
+      <span className="cyber-btn-corner cyber-btn-corner-bl" aria-hidden="true" />
+      <span className="cyber-btn-corner cyber-btn-corner-br" aria-hidden="true" />
+
+      <span
+        className={`cyber-btn-text relative z-20 ${glitching ? 'cyber-btn-glitch-hover' : ''}`}
+        data-text={typeof children === 'string' ? children : undefined}
+      >
         {children}
       </span>
 
-      {/* Glitch overlay */}
-      <span
-        className={`cyber-glitch ${hover ? "animate" : ""}`}
-        aria-hidden="true"
-      />
+      <span className={`cyber-glitch ${glitching ? 'cyber-glitch-hover' : ''}`} aria-hidden="true" />
+      <span className={`cyber-btn-scanline ${glitching ? 'cyber-btn-scanline-hover' : ''}`} aria-hidden="true" />
     </motion.button>
   );
 }
-
-

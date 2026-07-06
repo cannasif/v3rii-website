@@ -9,6 +9,9 @@ type Props = {
   theme?: 'dark' | 'light'
 }
 
+// Cyber tema: yuvarlak köşe yok, kesik köşeli clip-path
+const CYBER_CLIP = 'polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px))'
+
 export default function AnimatedButton({ label, onClick, variant = 'primary', theme = 'dark' }: Props) {
   const [hover, setHover] = useState(false)
   const isLight = theme === 'light'
@@ -16,13 +19,16 @@ export default function AnimatedButton({ label, onClick, variant = 'primary', th
   if (variant === 'outline') {
     return (
       <motion.button
-        whileHover={{ scale: 1.05, backgroundColor: '#8b5cf6', color: '#ffffff', boxShadow: '0 15px 30px -10px rgba(139, 92, 246, 0.4)' }}
-        whileTap={{ scale: 0.95 }}
+        whileHover={{ scale: 1.04, backgroundColor: '#8b5cf6', color: '#ffffff', boxShadow: '0 15px 30px -10px rgba(139, 92, 246, 0.4)' }}
+        whileTap={{ scale: 0.97 }}
         onClick={onClick}
-        className={`border px-8 py-4 rounded-full font-semibold transition-all duration-300 relative overflow-hidden group ring-1 ring-purple-400/30 shadow-[0_0_18px_rgba(139,92,246,0.35)] font-mono font-bold tracking-tight ${
+        style={{ clipPath: CYBER_CLIP }}
+        className={`relative border px-8 py-4 font-semibold transition-all duration-300 overflow-hidden group ring-1 ring-purple-400/30 shadow-[0_0_18px_rgba(139,92,246,0.35)] font-mono font-bold tracking-wider uppercase text-sm ${
           isLight ? 'border-fuchsia-600 text-fuchsia-700 bg-white/80' : 'border-purple-400 text-purple-400'
         }`}
       >
+        <span className="cyber-btn-corner cyber-btn-corner-tl" aria-hidden="true" />
+        <span className="cyber-btn-corner cyber-btn-corner-br" aria-hidden="true" />
         <span className="relative z-10">{label}</span>
         <div className="absolute inset-0 bg-purple-400 scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
       </motion.button>
@@ -31,18 +37,21 @@ export default function AnimatedButton({ label, onClick, variant = 'primary', th
 
   return (
     <motion.button
-      whileHover={{ scale: 1.05, boxShadow: '0 20px 40px -12px rgba(139, 92, 246, 0.4)', background: 'linear-gradient(45deg, #06b6d4, #8b5cf6, #06b6d4)' }}
-      whileTap={{ scale: 0.95 }}
+      whileHover={{ scale: 1.04, boxShadow: '0 20px 40px -12px rgba(236, 72, 153, 0.5)', background: 'linear-gradient(45deg, #ec4899, #f97316, #fbbf24, #ec4899)' }}
+      whileTap={{ scale: 0.97 }}
       animate={{ backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'] }}
       transition={{ backgroundPosition: { duration: 3, repeat: Infinity, ease: 'linear' } }}
       onHoverStart={() => setHover(true)}
       onHoverEnd={() => setHover(false)}
       onClick={onClick}
-      className={`bg-gradient-to-r from-cyan-500 to-purple-500 text-white px-8 py-4 rounded-full font-semibold hover:shadow-lg hover:shadow-purple-500/25 transition-all duration-300 flex items-center gap-2 relative overflow-hidden group shadow-[0_0_20px_rgba(139,92,246,0.35)] font-mono font-bold tracking-tight ${
-        isLight ? 'ring-1 ring-cyan-600/40' : 'ring-1 ring-cyan-400/30'
+      style={{ clipPath: CYBER_CLIP, backgroundSize: '200% 200%' }}
+      className={`relative bg-gradient-to-r from-pink-600 via-orange-500 to-amber-400 text-white px-8 py-4 font-semibold hover:shadow-lg hover:shadow-pink-500/30 transition-all duration-300 flex items-center gap-2 overflow-hidden group shadow-[0_0_20px_rgba(236,72,153,0.4)] font-mono font-bold tracking-wider uppercase text-sm ${
+        isLight ? 'ring-1 ring-pink-600/40' : 'ring-1 ring-pink-400/40'
       }`}
-      style={{ backgroundSize: '200% 200%' }}
     >
+      <span className="cyber-btn-corner cyber-btn-corner-tl" aria-hidden="true" />
+      <span className="cyber-btn-corner cyber-btn-corner-br" aria-hidden="true" />
+
       <span className="relative z-10 flex items-center gap-2">
         {label}
         <ChevronRight className="w-5 h-5" />
