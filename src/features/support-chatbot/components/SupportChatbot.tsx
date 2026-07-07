@@ -50,7 +50,7 @@ type SpeechRecognitionInstance = {
   interimResults: boolean
   lang: string
   onresult: ((event: SpeechRecognitionEventLike) => void) | null
-  onerror: (() => void) | null
+  onerror: ((event?: { error?: string }) => void) | null
   onend: (() => void) | null
   start: () => void
   stop: () => void
@@ -325,6 +325,7 @@ export default function SupportChatbot({ language, theme }: Props) {
   const conversationModeEnabledRef = useRef(false)
   const requiresManualVoiceTurnRef = useRef(false)
   const manualSpeechUnlockedRef = useRef(false)
+  const suppressRecognitionRestartRef = useRef(false)
   const startListeningRef = useRef<() => void>(() => undefined)
   const submitMessageRef = useRef<(value: string) => void>(() => undefined)
   const voiceTimeoutRef = useRef<number | null>(null)
@@ -438,6 +439,7 @@ export default function SupportChatbot({ language, theme }: Props) {
 
   const stopListening = useCallback((disableConversationMode = false) => {
     clearVoiceTimers()
+    suppressRecognitionRestartRef.current = true
     recognitionRef.current?.stop()
     recognitionRef.current = null
     latestTranscriptRef.current = ''
@@ -463,15 +465,12 @@ export default function SupportChatbot({ language, theme }: Props) {
   const finishVoiceTurn = useCallback(() => {
     setIsSpeaking(false)
     setVoicePlaybackBlocked(false)
+    setAwaitingVoiceContinue(false)
+    setAwaitingTapToSpeak(false)
 
     if (!conversationModeEnabledRef.current || !isOpenRef.current) return
 
-    if (requiresManualVoiceTurnRef.current) {
-      setAwaitingVoiceContinue(true)
-      return
-    }
-
-    window.setTimeout(() => startListeningRef.current(), 250)
+    window.setTimeout(() => startListeningRef.current(), requiresManualVoiceTurnRef.current ? 650 : 250)
   }, [])
 
   const speakWithBrowser = useCallback((value: string, persona = voicePersona) => {
@@ -524,7 +523,10 @@ export default function SupportChatbot({ language, theme }: Props) {
         clearSpeechKeepAlive()
         setIsSpeaking(false)
         setVoicePlaybackBlocked(true)
-        if (conversationModeEnabledRef.current && requiresManualVoiceTurnRef.current) {
+        if (conversationModeEnabledRef.current && isOpenRef.current) {
+          setAwaitingTapToSpeak(false)
+          window.setTimeout(() => startListeningRef.current(), 650)
+        } else if (requiresManualVoiceTurnRef.current) {
           setAwaitingTapToSpeak(true)
         }
       }
@@ -545,7 +547,11 @@ export default function SupportChatbot({ language, theme }: Props) {
     if (requiresManualVoiceTurnRef.current && !manualSpeechUnlockedRef.current) {
       setIsSpeaking(false)
       setVoicePlaybackBlocked(false)
-      setAwaitingTapToSpeak(true)
+      if (conversationModeEnabledRef.current && isOpenRef.current) {
+        window.setTimeout(() => startListeningRef.current(), 250)
+      } else {
+        setAwaitingTapToSpeak(true)
+      }
       return
     }
 
@@ -961,7 +967,9 @@ export default function SupportChatbot({ language, theme }: Props) {
     if (isListeningRef.current || isSending) return
 
     clearVoiceTimers()
+    suppressRecognitionRestartRef.current = false
     setAwaitingVoiceContinue(false)
+    setAwaitingTapToSpeak(false)
     setVoicePlaybackBlocked(false)
     latestTranscriptRef.current = ''
     stopSpeaking()
@@ -1011,12 +1019,34 @@ export default function SupportChatbot({ language, theme }: Props) {
         }, 1400)
       }
     }
-    recognition.onerror = () => {
-      stopListening(true)
+    recognition.onerror = (event) => {
+      clearVoiceTimers()
+      recognitionRef.current = null
+      latestTranscriptRef.current = ''
+      setIsListening(false)
+
+      if (event?.error === 'not-allowed' || event?.error === 'service-not-allowed') {
+        stopListening(true)
+        return
+      }
+
+      if (conversationModeEnabledRef.current && isOpenRef.current) {
+        window.setTimeout(() => startListeningRef.current(), 800)
+      }
     }
     recognition.onend = () => {
       clearVoiceTimers()
       setIsListening(false)
+      recognitionRef.current = null
+
+      if (suppressRecognitionRestartRef.current) {
+        suppressRecognitionRestartRef.current = false
+        return
+      }
+
+      if (conversationModeEnabledRef.current && isOpenRef.current && !latestTranscriptRef.current.trim()) {
+        window.setTimeout(() => startListeningRef.current(), 700)
+      }
     }
 
     setIsListening(true)
