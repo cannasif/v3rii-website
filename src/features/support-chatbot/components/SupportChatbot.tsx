@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Language, Theme } from '../../../App'
-import { askKnowledgeBase, sendSupportRequest, trackChatEvent } from '../api/supportRequestApi'
+import { askKnowledgeBase, sendSupportRequest, trackChatEvent, transcribeVoice } from '../api/supportRequestApi'
 import type {
   ChatMessage,
   ChatMessageCard,
@@ -88,18 +88,23 @@ const text = {
     conversationModeOn: 'Konuşma modu açık',
     conversationModeOff: 'Konuşma modu kapalı',
     voiceSessionTitle: 'AI sesli görüşme',
-    voiceSessionSubtitle: 'Konuşun, ben yazıya çevirip yanıtı seslendireyim.',
-    iosDictationTitle: 'iPhone sesli yazma modu',
-    iosDictationHint:
-      'iOS tarayıcılarında canlı mikrofon API’si kararsızdır. Metin alanı açılınca iPhone klavyesindeki mikrofonla konuşup Gönder’e dokunun.',
-    iosDictationAction: 'iPhone dikteyi aç',
-    iosDictationInputHint: 'iPhone klavyesindeki mikrofonla konuşun; metin buraya düşünce Gönder’e dokunun.',
+    voiceSessionSubtitle: 'Konuşun, ben dinleyip yanıtı seslendireyim.',
+    iosVoiceTitle: 'iPhone sesli görüşme',
+    iosVoiceHint:
+      'iPhone’da tarayıcı konuşmanızı güvenli şekilde dinler, ardından V3RII API cevabı hazırlar.',
+    iosVoiceAction: 'Konuşmaya başla',
+    iosVoiceInputHint: 'Dinliyorum. Konuşmanız bitince kaydı durdurun; ben düşünüp cevabı hazırlayayım.',
+    stopRecording: 'Konuşmayı bitir',
+    transcribing: 'Düşünüyorum...',
+    transcriptionUnavailable:
+      'Sizi dinledim fakat sunucuda sesli yanıt motoru henüz aktif değil. Lütfen şimdilik mesajınızı yazarak gönderin.',
+    transcriptionFailed: 'Sesli mesaj işlenemedi. Lütfen tekrar deneyin veya mesajınızı yazın.',
     startConversation: 'Konuşmaya başla',
     closeConversation: 'Konuşmayı kapat',
     femaleVoice: 'Kadın sesi',
     maleVoice: 'Erkek sesi',
     voiceWaiting: 'Hazırım. Konuşmaya başla dediğinizde dinlerim.',
-    voiceListeningDetail: 'Konuşabilirsiniz, dinliyorum ve metne çeviriyorum.',
+    voiceListeningDetail: 'Konuşabilirsiniz, sizi dinliyorum.',
     voiceSpeakingDetail: 'Yanıtı seslendiriyorum; bitince tekrar dinlemeye geçebilirim.',
     voiceManualContinue: 'Ses alamadım. Tekrar konuşmak için devam et’e dokunun.',
     voiceTapToSpeak: 'Cevap hazır. iOS Safari’de sesi duymak için cevabı sesli okuya dokunun.',
@@ -166,18 +171,23 @@ const text = {
     conversationModeOn: 'Conversation mode on',
     conversationModeOff: 'Conversation mode off',
     voiceSessionTitle: 'AI voice session',
-    voiceSessionSubtitle: 'Speak naturally; I will transcribe and read the answer.',
-    iosDictationTitle: 'iPhone dictation mode',
-    iosDictationHint:
-      'Live microphone recognition is unreliable in iOS browsers. After the text field opens, use the iPhone keyboard microphone and tap Send.',
-    iosDictationAction: 'Open iPhone dictation',
-    iosDictationInputHint: 'Use the iPhone keyboard microphone; when text appears here, tap Send.',
+    voiceSessionSubtitle: 'Speak naturally; I will listen and read the answer.',
+    iosVoiceTitle: 'iPhone voice session',
+    iosVoiceHint:
+      'On iPhone, the browser securely listens to your turn, then the V3RII API prepares the answer.',
+    iosVoiceAction: 'Start speaking',
+    iosVoiceInputHint: 'Listening. Stop when you finish; I will think and prepare the answer.',
+    stopRecording: 'Finish speaking',
+    transcribing: 'Thinking...',
+    transcriptionUnavailable:
+      'I listened, but the server-side voice engine is not enabled yet. Please type your message for now.',
+    transcriptionFailed: 'Voice message could not be processed. Please try again or type your message.',
     startConversation: 'Start speaking',
     closeConversation: 'Close voice',
     femaleVoice: 'Female voice',
     maleVoice: 'Male voice',
     voiceWaiting: 'Ready. Press start speaking and I will listen.',
-    voiceListeningDetail: 'You can speak now; I am listening and transcribing.',
+    voiceListeningDetail: 'You can speak now; I am listening.',
     voiceSpeakingDetail: 'I am reading the answer; I can listen again afterwards.',
     voiceManualContinue: 'I could not hear you. Tap continue to speak again.',
     voiceTapToSpeak: 'Answer is ready. On iOS Safari, tap read answer aloud to hear it.',
@@ -326,6 +336,8 @@ export default function SupportChatbot({ language, theme }: Props) {
   const [awaitingVoiceContinue, setAwaitingVoiceContinue] = useState(false)
   const [awaitingTapToSpeak, setAwaitingTapToSpeak] = useState(false)
   const [requiresManualVoiceTurn, setRequiresManualVoiceTurn] = useState(false)
+  const [isRecordingVoice, setIsRecordingVoice] = useState(false)
+  const [isTranscribingVoice, setIsTranscribingVoice] = useState(false)
   const [speechSupported, setSpeechSupported] = useState(false)
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -344,6 +356,10 @@ export default function SupportChatbot({ language, theme }: Props) {
   const voiceTimeoutRef = useRef<number | null>(null)
   const voiceFinalFallbackRef = useRef<number | null>(null)
   const speechKeepAliveRef = useRef<number | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const mediaStreamRef = useRef<MediaStream | null>(null)
+  const mediaChunksRef = useRef<Blob[]>([])
+  const voiceRecordingTimeoutRef = useRef<number | null>(null)
   const latestTranscriptRef = useRef('')
   const lastSpokenMessageIdRef = useRef<string | null>(null)
   const lastSpokenTextRef = useRef('')
@@ -388,6 +404,32 @@ export default function SupportChatbot({ language, theme }: Props) {
       window.clearTimeout(voiceFinalFallbackRef.current)
       voiceFinalFallbackRef.current = null
     }
+  }, [])
+
+  const clearVoiceRecordingTimer = useCallback(() => {
+    if (voiceRecordingTimeoutRef.current) {
+      window.clearTimeout(voiceRecordingTimeoutRef.current)
+      voiceRecordingTimeoutRef.current = null
+    }
+  }, [])
+
+  const stopMediaStream = useCallback(() => {
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop())
+    mediaStreamRef.current = null
+  }, [])
+
+  const selectRecordingMimeType = useCallback(() => {
+    if (!('MediaRecorder' in window)) return ''
+
+    const candidates = [
+      'audio/mp4',
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/aac',
+      'audio/wav'
+    ]
+
+    return candidates.find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) ?? ''
   }, [])
 
   const selectPreferredVoice = useCallback((persona = voicePersona) => {
@@ -972,13 +1014,28 @@ export default function SupportChatbot({ language, theme }: Props) {
     })
   }
 
-  const openManualVoiceInput = useCallback(() => {
-    const focusInput = () => {
-      const inputElement = inputRef.current
-      if (!inputElement) return
-      inputElement.focus()
-      const cursorPosition = inputElement.value.length
-      inputElement.setSelectionRange(cursorPosition, cursorPosition)
+  const stopRecordedVoiceInput = useCallback(() => {
+    clearVoiceRecordingTimer()
+    const recorder = mediaRecorderRef.current
+    if (recorder && recorder.state !== 'inactive') {
+      recorder.stop()
+      return
+    }
+
+    mediaRecorderRef.current = null
+    stopMediaStream()
+    setIsRecordingVoice(false)
+  }, [clearVoiceRecordingTimer, stopMediaStream])
+
+  const startRecordedVoiceInput = useCallback(async () => {
+    if (isRecordingVoice) {
+      stopRecordedVoiceInput()
+      return
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia || !('MediaRecorder' in window)) {
+      addMessage('system', t.speechNotSupported, 'voice')
+      return
     }
 
     setConversationModeEnabled(true)
@@ -987,14 +1044,100 @@ export default function SupportChatbot({ language, theme }: Props) {
     setAwaitingTapToSpeak(false)
     setVoicePlaybackBlocked(false)
     manualSpeechUnlockedRef.current = true
+    mediaChunksRef.current = []
+    stopSpeaking()
     void unlockAudioPlayback()
-    focusInput()
-    window.setTimeout(focusInput, 80)
-  }, [unlockAudioPlayback])
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      })
+      const mimeType = selectRecordingMimeType()
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
+
+      mediaStreamRef.current = stream
+      mediaRecorderRef.current = recorder
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          mediaChunksRef.current.push(event.data)
+        }
+      }
+
+      recorder.onerror = () => {
+        clearVoiceRecordingTimer()
+        stopMediaStream()
+        mediaRecorderRef.current = null
+        setIsRecordingVoice(false)
+        addMessage('system', t.transcriptionFailed, 'voice')
+      }
+
+      recorder.onstop = () => {
+        clearVoiceRecordingTimer()
+        stopMediaStream()
+        mediaRecorderRef.current = null
+        setIsRecordingVoice(false)
+
+        const chunks = mediaChunksRef.current
+        mediaChunksRef.current = []
+        const audioType = recorder.mimeType || mimeType || 'audio/mp4'
+        const audio = new Blob(chunks, { type: audioType })
+        if (audio.size <= 0) {
+          addMessage('system', t.transcriptionFailed, 'voice')
+          return
+        }
+
+        setIsTranscribingVoice(true)
+        transcribeVoice(audio, lead.language)
+          .then((result) => {
+            const transcript = result.text?.trim()
+            if (result.success && transcript) {
+              setInput(transcript)
+              submitMessageRef.current(transcript)
+              return
+            }
+
+            addMessage('system', result.enabled ? result.message || t.transcriptionFailed : t.transcriptionUnavailable, 'voice')
+          })
+          .catch(() => addMessage('system', t.transcriptionFailed, 'voice'))
+          .finally(() => setIsTranscribingVoice(false))
+      }
+
+      recorder.start()
+      setIsRecordingVoice(true)
+      voiceRecordingTimeoutRef.current = window.setTimeout(() => {
+        if (mediaRecorderRef.current?.state === 'recording') {
+          mediaRecorderRef.current.stop()
+        }
+      }, 10000)
+    } catch {
+      clearVoiceRecordingTimer()
+      stopMediaStream()
+      mediaRecorderRef.current = null
+      setIsRecordingVoice(false)
+      addMessage('system', t.transcriptionFailed, 'voice')
+    }
+  }, [
+    clearVoiceRecordingTimer,
+    isRecordingVoice,
+    lead.language,
+    selectRecordingMimeType,
+    stopMediaStream,
+    stopRecordedVoiceInput,
+    stopSpeaking,
+    t.speechNotSupported,
+    t.transcriptionFailed,
+    t.transcriptionUnavailable,
+    unlockAudioPlayback
+  ])
 
   const startListening = useCallback(() => {
     if (requiresManualVoiceTurnRef.current) {
-      openManualVoiceInput()
+      void startRecordedVoiceInput()
       return
     }
 
@@ -1133,7 +1276,7 @@ export default function SupportChatbot({ language, theme }: Props) {
     isSending,
     lead.language,
     messages,
-    openManualVoiceInput,
+    startRecordedVoiceInput,
     stopListening,
     stopSpeaking,
     t.speechNotSupported,
@@ -1157,7 +1300,7 @@ export default function SupportChatbot({ language, theme }: Props) {
     setConversationModeEnabled(true)
     manualSpeechUnlockedRef.current = true
     if (requiresManualVoiceTurnRef.current) {
-      openManualVoiceInput()
+      void startRecordedVoiceInput()
       return
     }
     startListening()
@@ -1191,6 +1334,7 @@ export default function SupportChatbot({ language, theme }: Props) {
 
   const closeConversationMode = () => {
     stopListening(false)
+    stopRecordedVoiceInput()
     stopSpeaking()
     setVoiceOutputEnabled(false)
     setConversationModeEnabled(false)
@@ -1212,7 +1356,7 @@ export default function SupportChatbot({ language, theme }: Props) {
     manualSpeechUnlockedRef.current = true
     void unlockAudioPlayback()
     if (requiresManualVoiceTurnRef.current) {
-      openManualVoiceInput()
+      void startRecordedVoiceInput()
       return
     }
     startListening()
@@ -1259,9 +1403,14 @@ export default function SupportChatbot({ language, theme }: Props) {
   const PANEL_CLIP = 'polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px)'
   const CHIP_CLIP = 'polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px)'
   const LAUNCHER_CLIP = 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)'
-  const voiceSessionVisible = conversationModeEnabled || isListening || isSpeaking || awaitingVoiceContinue || awaitingTapToSpeak
+  const voiceSessionVisible =
+    conversationModeEnabled || isListening || isSpeaking || isRecordingVoice || isTranscribingVoice || awaitingVoiceContinue || awaitingTapToSpeak
   const voiceStatusText = voicePlaybackBlocked
     ? t.audioBlocked
+    : isTranscribingVoice
+      ? t.transcribing
+    : isRecordingVoice
+      ? t.voiceListeningDetail
     : awaitingTapToSpeak
       ? t.voiceTapToSpeak
     : awaitingVoiceContinue
@@ -1437,10 +1586,10 @@ export default function SupportChatbot({ language, theme }: Props) {
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <p className="font-cyber text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-400">
-                            {requiresManualVoiceTurn ? t.iosDictationTitle : t.voiceSessionTitle}
+                            {requiresManualVoiceTurn ? t.iosVoiceTitle : t.voiceSessionTitle}
                           </p>
                           <p className={`mt-1 text-xs leading-snug ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
-                            {requiresManualVoiceTurn ? t.iosDictationHint : t.voiceSessionSubtitle}
+                            {requiresManualVoiceTurn ? t.iosVoiceHint : t.voiceSessionSubtitle}
                           </p>
                         </div>
                         <button
@@ -1501,12 +1650,12 @@ export default function SupportChatbot({ language, theme }: Props) {
                             setConversationModeEnabled(true)
                             manualSpeechUnlockedRef.current = true
                             if (requiresManualVoiceTurnRef.current) {
-                              openManualVoiceInput()
+                              void startRecordedVoiceInput()
                               return
                             }
                             startListening()
                           }}
-                          disabled={(!speechSupported && !requiresManualVoiceTurn) || isSending}
+                          disabled={(!speechSupported && !requiresManualVoiceTurn) || isSending || isTranscribingVoice}
                           className={`min-h-10 flex-1 border px-3 py-2 font-cyber text-[10px] font-bold uppercase tracking-wider transition disabled:cursor-not-allowed disabled:opacity-55 ${
                             isListening
                               ? 'border-red-400 bg-red-500/15 text-red-300'
@@ -1514,14 +1663,18 @@ export default function SupportChatbot({ language, theme }: Props) {
                           }`}
                           style={{ clipPath: CHIP_CLIP }}
                         >
-                          {isListening
+                          {isRecordingVoice
+                            ? t.stopRecording
+                            : isTranscribingVoice
+                              ? t.transcribing
+                              : isListening
                             ? t.stopVoiceInput
                             : awaitingTapToSpeak
                               ? t.speakAnswer
                               : awaitingVoiceContinue
                                 ? t.continueListening
                                 : requiresManualVoiceTurn
-                                  ? t.iosDictationAction
+                                  ? t.iosVoiceAction
                                   : t.startConversation}
                         </button>
                         <div className="flex h-10 items-end gap-1 px-1" aria-hidden="true">
@@ -1710,7 +1863,7 @@ export default function SupportChatbot({ language, theme }: Props) {
                       }`}
                       style={{ clipPath: CHIP_CLIP }}
                     >
-                      {t.iosDictationInputHint}
+                      {t.iosVoiceInputHint}
                     </div>
                   )}
                   <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-cyber text-xs text-pink-500">&gt;</span>
@@ -1738,20 +1891,20 @@ export default function SupportChatbot({ language, theme }: Props) {
                 <button
                   type="button"
                   onClick={toggleListening}
-                  disabled={isSending}
-                  aria-label={isListening ? t.stopVoiceInput : requiresManualVoiceTurn ? t.iosDictationAction : t.voiceInput}
-                  title={isListening ? t.stopVoiceInput : requiresManualVoiceTurn ? t.iosDictationAction : t.voiceInput}
-                  aria-pressed={isListening}
+                  disabled={isSending || isTranscribingVoice}
+                  aria-label={isRecordingVoice ? t.stopRecording : isListening ? t.stopVoiceInput : requiresManualVoiceTurn ? t.iosVoiceAction : t.voiceInput}
+                  title={isRecordingVoice ? t.stopRecording : isListening ? t.stopVoiceInput : requiresManualVoiceTurn ? t.iosVoiceAction : t.voiceInput}
+                  aria-pressed={isListening || isRecordingVoice}
                   style={{ clipPath: CHIP_CLIP }}
                   className={`grid h-11 w-11 shrink-0 place-items-center border transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                    isListening
+                    isListening || isRecordingVoice
                       ? 'border-red-400 bg-red-500/15 text-red-300 shadow-[0_0_22px_rgba(248,113,113,0.35)]'
                       : isLight
                         ? 'border-cyan-300 bg-white text-cyan-700 hover:border-pink-500 hover:text-pink-600'
                         : 'border-cyan-400/25 bg-[#0a0f18] text-cyan-300 hover:border-pink-500/60 hover:text-pink-300'
                   }`}
                 >
-                  {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                  {isListening || isRecordingVoice ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                 </button>
                 <button
                   type="submit"

@@ -75,3 +75,16 @@ export async function askKnowledgeBase(product: SupportProductKey | undefined, q
       sessionId
   })
 }
+
+export async function transcribeVoice(audio: Blob, language: string): Promise<{ enabled: boolean; success: boolean; text?: string; message?: string }> {
+  const formData = new FormData()
+  const extension = audio.type.includes('mp4') ? 'mp4' : audio.type.includes('wav') ? 'wav' : 'webm'
+  formData.append('audio', audio, `v3rii-voice.${extension}`)
+  formData.append('language', language)
+
+  return api.post('/api/voice/transcribe', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+}
