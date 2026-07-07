@@ -716,7 +716,7 @@ export default function SupportChatbot({ language, theme }: Props) {
 
   useEffect(() => {
     const lastMessage = messages[messages.length - 1]
-    if (!isOpen || !voiceOutputEnabled || !lastMessage || lastMessage.sender === 'user') return
+    if (!isOpen || !voiceOutputEnabled || !lastMessage || lastMessage.sender !== 'bot') return
     if (lastSpokenMessageIdRef.current === lastMessage.id) return
 
     lastSpokenMessageIdRef.current = lastMessage.id
