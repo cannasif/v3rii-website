@@ -96,9 +96,11 @@ const text = {
     voiceListeningDetail: 'Konuşabilirsiniz, dinliyorum ve metne çeviriyorum.',
     voiceSpeakingDetail: 'Yanıtı seslendiriyorum; bitince tekrar dinlemeye geçebilirim.',
     voiceManualContinue: 'iOS Safari’de tekrar dinlemek için devam et’e dokunun.',
+    voiceTapToSpeak: 'Cevap hazır. iOS Safari’de sesi duymak için cevabı sesli okuya dokunun.',
+    speakAnswer: 'Cevabı sesli oku',
     continueListening: 'Devam et ve dinle',
     enableAudio: 'Sesi etkinleştir',
-    audioBlocked: 'Mobil tarayıcı sesi kilitledi. Sesi etkinleştir’e bir kez dokunun.',
+    audioBlocked: 'Mobil tarayıcı sesi kilitledi. Cevabı sesli okuya bir kez dokunun.',
     listenAnswer: 'Cevabı dinle',
     listening: 'Dinliyorum...',
     speaking: 'Cevap seslendiriliyor...',
@@ -167,9 +169,11 @@ const text = {
     voiceListeningDetail: 'You can speak now; I am listening and transcribing.',
     voiceSpeakingDetail: 'I am reading the answer; I can listen again afterwards.',
     voiceManualContinue: 'On iOS Safari, tap continue to listen again.',
+    voiceTapToSpeak: 'Answer is ready. On iOS Safari, tap read answer aloud to hear it.',
+    speakAnswer: 'Read answer aloud',
     continueListening: 'Continue listening',
     enableAudio: 'Enable audio',
-    audioBlocked: 'Your mobile browser blocked audio. Tap enable audio once.',
+    audioBlocked: 'Your mobile browser blocked audio. Tap read answer aloud once.',
     listenAnswer: 'Listen to answer',
     listening: 'Listening...',
     speaking: 'Speaking...',
@@ -270,6 +274,7 @@ export default function SupportChatbot({ language, theme }: Props) {
   const [audioUnlocked, setAudioUnlocked] = useState(false)
   const [voicePlaybackBlocked, setVoicePlaybackBlocked] = useState(false)
   const [awaitingVoiceContinue, setAwaitingVoiceContinue] = useState(false)
+  const [awaitingTapToSpeak, setAwaitingTapToSpeak] = useState(false)
   const [requiresManualVoiceTurn, setRequiresManualVoiceTurn] = useState(false)
   const [speechSupported, setSpeechSupported] = useState(false)
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([])
@@ -390,11 +395,13 @@ export default function SupportChatbot({ language, theme }: Props) {
     if (disableConversationMode) {
       setConversationModeEnabled(false)
       setAwaitingVoiceContinue(false)
+      setAwaitingTapToSpeak(false)
     }
   }, [clearVoiceTimers])
 
   const continueVoiceConversation = useCallback(() => {
     setAwaitingVoiceContinue(false)
+    setAwaitingTapToSpeak(false)
     setVoicePlaybackBlocked(false)
     setConversationModeEnabled(true)
     setVoiceOutputEnabled(true)
@@ -453,6 +460,13 @@ export default function SupportChatbot({ language, theme }: Props) {
     window.speechSynthesis?.cancel()
     outputAudioRef.current?.pause()
     lastSpokenTextRef.current = value
+
+    if (requiresManualVoiceTurnRef.current) {
+      setIsSpeaking(false)
+      setVoicePlaybackBlocked(false)
+      setAwaitingTapToSpeak(true)
+      return
+    }
 
     void synthesizeVoice({ text: cleaned, language: lead.language, persona })
       .then((result) => {
@@ -528,6 +542,8 @@ export default function SupportChatbot({ language, theme }: Props) {
     if (lastSpokenMessageIdRef.current === lastMessage.id) return
 
     lastSpokenMessageIdRef.current = lastMessage.id
+    lastSpokenTextRef.current = lastMessage.text
+    setAwaitingTapToSpeak(false)
     speak(lastMessage.text)
   }, [isOpen, messages, speak, voiceOutputEnabled])
 
@@ -569,6 +585,7 @@ export default function SupportChatbot({ language, theme }: Props) {
     stopListening(true)
     stopSpeaking()
     setAwaitingVoiceContinue(false)
+    setAwaitingTapToSpeak(false)
     setVoicePlaybackBlocked(false)
     setStep('product')
     setLead(initialLead(nextLanguage))
@@ -971,12 +988,27 @@ export default function SupportChatbot({ language, theme }: Props) {
     startListening()
   }
 
+  const speakLastAnswerFromUserGesture = () => {
+    const lastAnswer = lastSpokenTextRef.current.trim()
+    if (!lastAnswer) return
+
+    setVoiceOutputEnabled(true)
+    setConversationModeEnabled(true)
+    setAwaitingTapToSpeak(false)
+    setVoicePlaybackBlocked(false)
+    speakWithBrowser(lastAnswer, voicePersona)
+  }
+
   const changeVoicePersona = (persona: VoicePersona) => {
     setVoicePersona(persona)
     void unlockAudioPlayback()
 
     if (isSpeaking && lastSpokenTextRef.current) {
-      window.setTimeout(() => speak(lastSpokenTextRef.current, persona), 80)
+      if (requiresManualVoiceTurnRef.current) {
+        window.setTimeout(() => speakWithBrowser(lastSpokenTextRef.current, persona), 80)
+      } else {
+        window.setTimeout(() => speak(lastSpokenTextRef.current, persona), 80)
+      }
     }
   }
 
@@ -986,6 +1018,7 @@ export default function SupportChatbot({ language, theme }: Props) {
     setVoiceOutputEnabled(false)
     setConversationModeEnabled(false)
     setAwaitingVoiceContinue(false)
+    setAwaitingTapToSpeak(false)
     setVoicePlaybackBlocked(false)
   }
 
@@ -1043,9 +1076,11 @@ export default function SupportChatbot({ language, theme }: Props) {
   const PANEL_CLIP = 'polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px)'
   const CHIP_CLIP = 'polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px)'
   const LAUNCHER_CLIP = 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)'
-  const voiceSessionVisible = conversationModeEnabled || isListening || isSpeaking || awaitingVoiceContinue
+  const voiceSessionVisible = conversationModeEnabled || isListening || isSpeaking || awaitingVoiceContinue || awaitingTapToSpeak
   const voiceStatusText = voicePlaybackBlocked
     ? t.audioBlocked
+    : awaitingTapToSpeak
+      ? t.voiceTapToSpeak
     : awaitingVoiceContinue
       ? t.voiceManualContinue
       : isSpeaking
@@ -1272,6 +1307,10 @@ export default function SupportChatbot({ language, theme }: Props) {
                               continueVoiceConversation()
                               return
                             }
+                            if (awaitingTapToSpeak) {
+                              speakLastAnswerFromUserGesture()
+                              return
+                            }
                             setConversationModeEnabled(true)
                             startListening()
                           }}
@@ -1283,7 +1322,7 @@ export default function SupportChatbot({ language, theme }: Props) {
                           }`}
                           style={{ clipPath: CHIP_CLIP }}
                         >
-                          {isListening ? t.stopVoiceInput : awaitingVoiceContinue ? t.continueListening : t.startConversation}
+                          {isListening ? t.stopVoiceInput : awaitingTapToSpeak ? t.speakAnswer : awaitingVoiceContinue ? t.continueListening : t.startConversation}
                         </button>
                         <div className="flex h-10 items-end gap-1 px-1" aria-hidden="true">
                           {[0, 1, 2, 3, 4].map((bar) => (
@@ -1309,11 +1348,7 @@ export default function SupportChatbot({ language, theme }: Props) {
                         <button
                           type="button"
                           onClick={() => {
-                            void unlockAudioPlayback().then((unlocked) => {
-                              if (unlocked && lastSpokenTextRef.current) {
-                                speak(lastSpokenTextRef.current)
-                              }
-                            })
+                            speakLastAnswerFromUserGesture()
                           }}
                           className={`mt-2 border px-3 py-1.5 font-cyber text-[10px] font-bold uppercase tracking-wider transition ${
                             isLight
@@ -1322,7 +1357,21 @@ export default function SupportChatbot({ language, theme }: Props) {
                           }`}
                           style={{ clipPath: CHIP_CLIP }}
                         >
-                          {t.enableAudio}
+                          {t.speakAnswer}
+                        </button>
+                      )}
+                      {awaitingTapToSpeak && !voicePlaybackBlocked && (
+                        <button
+                          type="button"
+                          onClick={speakLastAnswerFromUserGesture}
+                          className={`mt-2 border px-3 py-1.5 font-cyber text-[10px] font-bold uppercase tracking-wider transition ${
+                            isLight
+                              ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                              : 'border-emerald-400/40 bg-emerald-400/10 text-emerald-300 hover:bg-emerald-400/20'
+                          }`}
+                          style={{ clipPath: CHIP_CLIP }}
+                        >
+                          {t.speakAnswer}
                         </button>
                       )}
                       {awaitingVoiceContinue && !voicePlaybackBlocked && (
@@ -1370,6 +1419,14 @@ export default function SupportChatbot({ language, theme }: Props) {
                           <button
                             type="button"
                             onClick={() => {
+                              setVoiceOutputEnabled(true)
+                              lastSpokenTextRef.current = message.text
+                              if (requiresManualVoiceTurnRef.current) {
+                                setAwaitingTapToSpeak(false)
+                                setVoicePlaybackBlocked(false)
+                                speakWithBrowser(message.text, voicePersona)
+                                return
+                              }
                               void unlockAudioPlayback().finally(() => speak(message.text))
                             }}
                             className="grid h-6 w-6 place-items-center border border-cyan-400/25 bg-cyan-400/5 text-cyan-300 transition hover:border-pink-400 hover:text-pink-300"
