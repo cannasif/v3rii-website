@@ -271,6 +271,7 @@ export default function SupportChatbot({ language, theme }: Props) {
   const voiceFinalFallbackRef = useRef<number | null>(null)
   const latestTranscriptRef = useRef('')
   const lastSpokenMessageIdRef = useRef<string | null>(null)
+  const lastSpokenTextRef = useRef('')
   const t = text[lead.language]
   const isLight = theme === 'light'
 
@@ -304,21 +305,29 @@ export default function SupportChatbot({ language, theme }: Props) {
     }
   }, [])
 
-  const selectPreferredVoice = useCallback(() => {
+  const selectPreferredVoice = useCallback((persona = voicePersona) => {
     const languagePrefix = lead.language === 'en' ? 'en' : 'tr'
     const localizedVoices = availableVoices.filter((voice) => voice.lang.toLowerCase().startsWith(languagePrefix))
     const femaleSignals = /female|woman|zira|seda|yelda|aylin|filiz|elif|google türkçe|google turkce/i
-    const maleSignals = /male|man|cem|tolga|murat|kaan|erkek/i
-    const personaSignals = voicePersona === 'female' ? femaleSignals : maleSignals
+    const maleSignals = /male|man|cem|tolga|murat|kaan|ahmet|mehmet|emre|erkek/i
+    const personaSignals = persona === 'female' ? femaleSignals : maleSignals
 
     return (
       localizedVoices.find((voice) => personaSignals.test(voice.name)) ??
-      localizedVoices[voicePersona === 'male' ? 1 : 0] ??
+      localizedVoices[persona === 'male' ? 1 : 0] ??
       localizedVoices[0] ??
       availableVoices.find((voice) => voice.default) ??
       null
     )
   }, [availableVoices, lead.language, voicePersona])
+
+  const getVoiceProfile = useCallback((persona = voicePersona) => {
+    if (persona === 'male') {
+      return { pitch: 0.68, rate: 0.91 }
+    }
+
+    return { pitch: 1.08, rate: 0.98 }
+  }, [voicePersona])
 
   const stopListening = useCallback((disableConversationMode = false) => {
     clearVoiceTimers()
@@ -331,17 +340,19 @@ export default function SupportChatbot({ language, theme }: Props) {
     }
   }, [clearVoiceTimers])
 
-  const speak = useCallback((value: string) => {
+  const speak = useCallback((value: string, persona = voicePersona) => {
     if (!('speechSynthesis' in window)) return
     const cleaned = cleanSpeechText(value)
     if (!cleaned) return
 
     window.speechSynthesis.cancel()
+    lastSpokenTextRef.current = value
+    const voiceProfile = getVoiceProfile(persona)
     const utterance = new SpeechSynthesisUtterance(cleaned)
     utterance.lang = lead.language === 'en' ? 'en-US' : 'tr-TR'
-    utterance.rate = 0.96
-    utterance.pitch = 1
-    utterance.voice = selectPreferredVoice()
+    utterance.rate = voiceProfile.rate
+    utterance.pitch = voiceProfile.pitch
+    utterance.voice = selectPreferredVoice(persona)
     utterance.onstart = () => setIsSpeaking(true)
     utterance.onend = () => {
       setIsSpeaking(false)
@@ -351,7 +362,7 @@ export default function SupportChatbot({ language, theme }: Props) {
     }
     utterance.onerror = () => setIsSpeaking(false)
     window.speechSynthesis.speak(utterance)
-  }, [cleanSpeechText, lead.language, selectPreferredVoice])
+  }, [cleanSpeechText, getVoiceProfile, lead.language, selectPreferredVoice, voicePersona])
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
@@ -825,6 +836,14 @@ export default function SupportChatbot({ language, theme }: Props) {
     startListening()
   }
 
+  const changeVoicePersona = (persona: VoicePersona) => {
+    setVoicePersona(persona)
+
+    if (isSpeaking && lastSpokenTextRef.current) {
+      window.setTimeout(() => speak(lastSpokenTextRef.current, persona), 80)
+    }
+  }
+
   const closeConversationMode = () => {
     stopListening(false)
     stopSpeaking()
@@ -1078,7 +1097,7 @@ export default function SupportChatbot({ language, theme }: Props) {
                           <button
                             key={persona}
                             type="button"
-                            onClick={() => setVoicePersona(persona)}
+                            onClick={() => changeVoicePersona(persona)}
                             className={`border px-2 py-1.5 font-cyber text-[10px] uppercase tracking-wider transition ${
                               voicePersona === persona
                                 ? 'border-emerald-400 bg-emerald-400/12 text-emerald-300 shadow-[0_0_16px_rgba(52,211,153,0.16)]'
