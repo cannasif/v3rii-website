@@ -75,3 +75,13 @@ export async function askKnowledgeBase(product: SupportProductKey | undefined, q
       sessionId
   })
 }
+
+export async function synthesizeVoice(payload: { text: string; language: string; persona: 'female' | 'male' }) {
+  return api.post<{
+    enabled: boolean
+    audioBase64?: string
+    contentType: string
+    provider: string
+    voiceName: string
+  }>('/api/voice/synthesize', payload)
+}

@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Language, Theme } from '../../../App'
-import { askKnowledgeBase, sendSupportRequest, trackChatEvent } from '../api/supportRequestApi'
+import { askKnowledgeBase, sendSupportRequest, synthesizeVoice, trackChatEvent } from '../api/supportRequestApi'
 import type {
   ChatMessage,
   ChatMessageCard,
@@ -272,6 +272,7 @@ export default function SupportChatbot({ language, theme }: Props) {
   const latestTranscriptRef = useRef('')
   const lastSpokenMessageIdRef = useRef<string | null>(null)
   const lastSpokenTextRef = useRef('')
+  const activeAudioRef = useRef<HTMLAudioElement | null>(null)
   const t = text[lead.language]
   const isLight = theme === 'light'
 
@@ -291,6 +292,8 @@ export default function SupportChatbot({ language, theme }: Props) {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel()
     }
+    activeAudioRef.current?.pause()
+    activeAudioRef.current = null
     setIsSpeaking(false)
   }, [])
 
@@ -340,13 +343,18 @@ export default function SupportChatbot({ language, theme }: Props) {
     }
   }, [clearVoiceTimers])
 
-  const speak = useCallback((value: string, persona = voicePersona) => {
-    if (!('speechSynthesis' in window)) return
+  const speakWithBrowser = useCallback((value: string, persona = voicePersona) => {
+    if (!('speechSynthesis' in window)) {
+      setIsSpeaking(false)
+      return
+    }
     const cleaned = cleanSpeechText(value)
-    if (!cleaned) return
+    if (!cleaned) {
+      setIsSpeaking(false)
+      return
+    }
 
     window.speechSynthesis.cancel()
-    lastSpokenTextRef.current = value
     const voiceProfile = getVoiceProfile(persona)
     const utterance = new SpeechSynthesisUtterance(cleaned)
     utterance.lang = lead.language === 'en' ? 'en-US' : 'tr-TR'
@@ -363,6 +371,41 @@ export default function SupportChatbot({ language, theme }: Props) {
     utterance.onerror = () => setIsSpeaking(false)
     window.speechSynthesis.speak(utterance)
   }, [cleanSpeechText, getVoiceProfile, lead.language, selectPreferredVoice, voicePersona])
+
+  const speak = useCallback((value: string, persona = voicePersona) => {
+    const cleaned = cleanSpeechText(value)
+    if (!cleaned) return
+
+    window.speechSynthesis?.cancel()
+    activeAudioRef.current?.pause()
+    activeAudioRef.current = null
+    lastSpokenTextRef.current = value
+
+    void synthesizeVoice({ text: cleaned, language: lead.language, persona })
+      .then((result) => {
+        if (!result.enabled || !result.audioBase64) {
+          speakWithBrowser(value, persona)
+          return
+        }
+
+        const audio = new Audio(`data:${result.contentType};base64,${result.audioBase64}`)
+        activeAudioRef.current = audio
+        audio.onplay = () => setIsSpeaking(true)
+        audio.onended = () => {
+          setIsSpeaking(false)
+          activeAudioRef.current = null
+          if (conversationModeEnabledRef.current && isOpenRef.current) {
+            window.setTimeout(() => startListeningRef.current(), 250)
+          }
+        }
+        audio.onerror = () => {
+          activeAudioRef.current = null
+          speakWithBrowser(value, persona)
+        }
+        void audio.play()
+      })
+      .catch(() => speakWithBrowser(value, persona))
+  }, [cleanSpeechText, lead.language, speakWithBrowser, voicePersona])
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
