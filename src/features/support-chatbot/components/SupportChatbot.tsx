@@ -95,7 +95,7 @@ const text = {
     voiceWaiting: 'Hazırım. Konuşmaya başla dediğinizde dinlerim.',
     voiceListeningDetail: 'Konuşabilirsiniz, dinliyorum ve metne çeviriyorum.',
     voiceSpeakingDetail: 'Yanıtı seslendiriyorum; bitince tekrar dinlemeye geçebilirim.',
-    voiceManualContinue: 'iOS Safari’de tekrar dinlemek için devam et’e dokunun.',
+    voiceManualContinue: 'Ses alamadım. Tekrar konuşmak için devam et’e dokunun.',
     voiceTapToSpeak: 'Cevap hazır. iOS Safari’de sesi duymak için cevabı sesli okuya dokunun.',
     speakAnswer: 'Cevabı sesli oku',
     continueListening: 'Devam et ve dinle',
@@ -168,7 +168,7 @@ const text = {
     voiceWaiting: 'Ready. Press start speaking and I will listen.',
     voiceListeningDetail: 'You can speak now; I am listening and transcribing.',
     voiceSpeakingDetail: 'I am reading the answer; I can listen again afterwards.',
-    voiceManualContinue: 'On iOS Safari, tap continue to listen again.',
+    voiceManualContinue: 'I could not hear you. Tap continue to speak again.',
     voiceTapToSpeak: 'Answer is ready. On iOS Safari, tap read answer aloud to hear it.',
     speakAnswer: 'Read answer aloud',
     continueListening: 'Continue listening',
@@ -980,7 +980,7 @@ export default function SupportChatbot({ language, theme }: Props) {
     const recognition = new SpeechRecognition()
     recognitionRef.current = recognition
     recognition.lang = lead.language === 'en' ? 'en-US' : 'tr-TR'
-    recognition.continuous = false
+    recognition.continuous = true
     recognition.interimResults = true
     recognition.onresult = (event) => {
       let transcript = ''
@@ -998,12 +998,6 @@ export default function SupportChatbot({ language, theme }: Props) {
       latestTranscriptRef.current = nextInput
       setInput(nextInput)
 
-      if (finalTranscript.trim()) {
-        stopListening(false)
-        submitMessageRef.current(finalTranscript.trim())
-        return
-      }
-
       if (nextInput) {
         if (voiceFinalFallbackRef.current) {
           window.clearTimeout(voiceFinalFallbackRef.current)
@@ -1016,7 +1010,7 @@ export default function SupportChatbot({ language, theme }: Props) {
           }
           stopListening(false)
           submitMessageRef.current(stableTranscript)
-        }, 1400)
+        }, finalTranscript.trim() ? 900 : 1500)
       }
     }
     recognition.onerror = (event) => {
@@ -1038,7 +1032,7 @@ export default function SupportChatbot({ language, theme }: Props) {
       }
 
       if (conversationModeEnabledRef.current && isOpenRef.current) {
-        window.setTimeout(() => startListeningRef.current(), 800)
+        setAwaitingVoiceContinue(true)
       }
     }
     recognition.onend = () => {
@@ -1059,12 +1053,22 @@ export default function SupportChatbot({ language, theme }: Props) {
       }
 
       if (conversationModeEnabledRef.current && isOpenRef.current && !latestTranscriptRef.current.trim()) {
-        window.setTimeout(() => startListeningRef.current(), 700)
+        setAwaitingVoiceContinue(true)
       }
     }
 
-    setIsListening(true)
-    recognition.start()
+    try {
+      recognition.start()
+      setIsListening(true)
+    } catch {
+      recognitionRef.current = null
+      setIsListening(false)
+      setVoicePlaybackBlocked(true)
+      if (conversationModeEnabledRef.current && isOpenRef.current) {
+        setAwaitingVoiceContinue(true)
+      }
+      return
+    }
     voiceTimeoutRef.current = window.setTimeout(() => {
       const stableTranscript = latestTranscriptRef.current.trim()
       stopListening(false)
@@ -1080,7 +1084,11 @@ export default function SupportChatbot({ language, theme }: Props) {
 
   const toggleListening = () => {
     if (isListening) {
+      const stableTranscript = latestTranscriptRef.current.trim() || input.trim()
       stopListening(false)
+      if (stableTranscript) {
+        submitMessageRef.current(stableTranscript)
+      }
       return
     }
 
@@ -1405,7 +1413,11 @@ export default function SupportChatbot({ language, theme }: Props) {
                           type="button"
                           onClick={() => {
                             if (isListening) {
+                              const stableTranscript = latestTranscriptRef.current.trim() || input.trim()
                               stopListening(false)
+                              if (stableTranscript) {
+                                submitMessageRef.current(stableTranscript)
+                              }
                               return
                             }
                             if (awaitingVoiceContinue) {
