@@ -246,6 +246,9 @@ export default function SupportChatbot({ language, theme }: Props) {
   const conversationModeEnabledRef = useRef(false)
   const startListeningRef = useRef<() => void>(() => undefined)
   const submitMessageRef = useRef<(value: string) => void>(() => undefined)
+  const voiceTimeoutRef = useRef<number | null>(null)
+  const voiceFinalFallbackRef = useRef<number | null>(null)
+  const latestTranscriptRef = useRef('')
   const lastSpokenMessageIdRef = useRef<string | null>(null)
   const t = text[lead.language]
   const isLight = theme === 'light'
@@ -268,6 +271,28 @@ export default function SupportChatbot({ language, theme }: Props) {
     }
     setIsSpeaking(false)
   }, [])
+
+  const clearVoiceTimers = useCallback(() => {
+    if (voiceTimeoutRef.current) {
+      window.clearTimeout(voiceTimeoutRef.current)
+      voiceTimeoutRef.current = null
+    }
+    if (voiceFinalFallbackRef.current) {
+      window.clearTimeout(voiceFinalFallbackRef.current)
+      voiceFinalFallbackRef.current = null
+    }
+  }, [])
+
+  const stopListening = useCallback((disableConversationMode = false) => {
+    clearVoiceTimers()
+    recognitionRef.current?.stop()
+    recognitionRef.current = null
+    latestTranscriptRef.current = ''
+    setIsListening(false)
+    if (disableConversationMode) {
+      setConversationModeEnabled(false)
+    }
+  }, [clearVoiceTimers])
 
   const speak = useCallback((value: string) => {
     if (!('speechSynthesis' in window)) return
@@ -335,17 +360,15 @@ export default function SupportChatbot({ language, theme }: Props) {
 
   useEffect(() => {
     if (!isOpen) {
-      recognitionRef.current?.stop()
-      setIsListening(false)
-      setConversationModeEnabled(false)
+      stopListening(true)
       stopSpeaking()
     }
-  }, [isOpen, stopSpeaking])
+  }, [isOpen, stopListening, stopSpeaking])
 
   useEffect(() => () => {
-    recognitionRef.current?.stop()
+    stopListening(true)
     stopSpeaking()
-  }, [stopSpeaking])
+  }, [stopListening, stopSpeaking])
 
   // Diğer bileşenler (ör. Yukarı Çık butonu) chatbot durumunu bilsin
   useEffect(() => {
@@ -370,10 +393,8 @@ export default function SupportChatbot({ language, theme }: Props) {
   }
 
   const reset = (nextLanguage = lead.language) => {
-    recognitionRef.current?.stop()
+    stopListening(true)
     stopSpeaking()
-    setIsListening(false)
-    setConversationModeEnabled(false)
     setStep('product')
     setLead(initialLead(nextLanguage))
     setMessages(createInitialMessages(nextLanguage))
@@ -658,6 +679,7 @@ export default function SupportChatbot({ language, theme }: Props) {
   const submitMessage = (value: string) => {
     const trimmed = value.trim()
     if (!trimmed || isSending) return
+    stopListening(false)
     addMessage('user', trimmed)
     setInput('')
     window.setTimeout(() => handleFlow(trimmed), 160)
@@ -688,6 +710,8 @@ export default function SupportChatbot({ language, theme }: Props) {
 
     if (isListeningRef.current || isSending) return
 
+    clearVoiceTimers()
+    latestTranscriptRef.current = ''
     stopSpeaking()
     setVoiceOutputEnabled(true)
 
@@ -709,24 +733,48 @@ export default function SupportChatbot({ language, theme }: Props) {
       }
 
       const nextInput = transcript.trim()
+      latestTranscriptRef.current = nextInput
       setInput(nextInput)
 
       if (finalTranscript.trim()) {
-        recognition.stop()
-        setIsListening(false)
+        stopListening(false)
         submitMessageRef.current(finalTranscript.trim())
+        return
+      }
+
+      if (nextInput) {
+        if (voiceFinalFallbackRef.current) {
+          window.clearTimeout(voiceFinalFallbackRef.current)
+        }
+        voiceFinalFallbackRef.current = window.setTimeout(() => {
+          const stableTranscript = latestTranscriptRef.current.trim()
+          if (!stableTranscript) {
+            stopListening(false)
+            return
+          }
+          stopListening(false)
+          submitMessageRef.current(stableTranscript)
+        }, 1400)
       }
     }
     recognition.onerror = () => {
-      setIsListening(false)
+      stopListening(true)
     }
     recognition.onend = () => {
+      clearVoiceTimers()
       setIsListening(false)
     }
 
     setIsListening(true)
     recognition.start()
-  }, [isSending, lead.language, stopSpeaking, t.speechNotSupported])
+    voiceTimeoutRef.current = window.setTimeout(() => {
+      const stableTranscript = latestTranscriptRef.current.trim()
+      stopListening(false)
+      if (stableTranscript) {
+        submitMessageRef.current(stableTranscript)
+      }
+    }, 12000)
+  }, [clearVoiceTimers, isSending, lead.language, stopListening, stopSpeaking, t.speechNotSupported])
 
   useEffect(() => {
     startListeningRef.current = startListening
@@ -734,9 +782,7 @@ export default function SupportChatbot({ language, theme }: Props) {
 
   const toggleListening = () => {
     if (isListening) {
-      setConversationModeEnabled(false)
-      recognitionRef.current?.stop()
-      setIsListening(false)
+      stopListening(true)
       return
     }
 
@@ -751,8 +797,7 @@ export default function SupportChatbot({ language, theme }: Props) {
       if (next) {
         startListening()
       } else {
-        recognitionRef.current?.stop()
-        setIsListening(false)
+        stopListening(false)
       }
       return next
     })
