@@ -57,6 +57,7 @@ type SpeechRecognitionInstance = {
 }
 
 type SpeechRecognitionEventLike = {
+  resultIndex: number
   results: ArrayLike<{
     isFinal: boolean
     0: {
@@ -324,6 +325,7 @@ export default function SupportChatbot({ language, theme }: Props) {
   const isOpenRef = useRef(false)
   const conversationModeEnabledRef = useRef(false)
   const requiresManualVoiceTurnRef = useRef(false)
+  const isMobileVoiceInputRef = useRef(false)
   const manualSpeechUnlockedRef = useRef(false)
   const suppressRecognitionRestartRef = useRef(false)
   const startListeningRef = useRef<() => void>(() => undefined)
@@ -569,6 +571,10 @@ export default function SupportChatbot({ language, theme }: Props) {
     const userAgent = window.navigator.userAgent
     const isIos = /iPad|iPhone|iPod/.test(userAgent) || (userAgent.includes('Mac') && navigator.maxTouchPoints > 1)
     const isSafari = /^((?!chrome|android|crios|fxios|edgios).)*safari/i.test(userAgent)
+    const isMobileVoiceInput =
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(userAgent) ||
+      (userAgent.includes('Mac') && navigator.maxTouchPoints > 1)
+    isMobileVoiceInputRef.current = isMobileVoiceInput
     setRequiresManualVoiceTurn(isIos && isSafari)
   }, [])
 
@@ -980,17 +986,28 @@ export default function SupportChatbot({ language, theme }: Props) {
     const recognition = new SpeechRecognition()
     recognitionRef.current = recognition
     recognition.lang = lead.language === 'en' ? 'en-US' : 'tr-TR'
-    recognition.continuous = true
+    recognition.continuous = !isMobileVoiceInputRef.current
     recognition.interimResults = true
     recognition.onresult = (event) => {
       let transcript = ''
       let finalTranscript = ''
 
-      for (let index = 0; index < event.results.length; index += 1) {
-        const result = event.results[index]
-        transcript += result[0].transcript
-        if (result.isFinal) {
-          finalTranscript += result[0].transcript
+      if (isMobileVoiceInputRef.current) {
+        const lastIndex = event.results.length - 1
+        if (lastIndex >= 0) {
+          const lastResult = event.results[lastIndex]
+          transcript = lastResult[0].transcript
+          if (lastResult.isFinal) {
+            finalTranscript = lastResult[0].transcript
+          }
+        }
+      } else {
+        for (let index = 0; index < event.results.length; index += 1) {
+          const result = event.results[index]
+          transcript += result[0].transcript
+          if (result.isFinal) {
+            finalTranscript += result[0].transcript
+          }
         }
       }
 
