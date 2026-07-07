@@ -82,8 +82,11 @@ const text = {
     stopVoiceInput: 'Dinlemeyi durdur',
     voiceOutputOn: 'Sesli cevap açık',
     voiceOutputOff: 'Sesli cevap kapalı',
+    conversationModeOn: 'Konuşma modu açık',
+    conversationModeOff: 'Konuşma modu kapalı',
     listenAnswer: 'Cevabı dinle',
     listening: 'Dinliyorum...',
+    speaking: 'Cevap seslendiriliyor...',
     speechNotSupported: 'Tarayıcınız sesli konuşma özelliğini desteklemiyor.',
     greeting:
       'Merhaba, ben V3RII yapay zeka destek asistanı. CRM, B2B, WMS ve UTS ürünleri hakkında bilgi verebilir, teknik destek veya demo talebinizi ekibe mail olarak iletebilirim.',
@@ -133,8 +136,11 @@ const text = {
     stopVoiceInput: 'Stop listening',
     voiceOutputOn: 'Voice replies on',
     voiceOutputOff: 'Voice replies off',
+    conversationModeOn: 'Conversation mode on',
+    conversationModeOff: 'Conversation mode off',
     listenAnswer: 'Listen to answer',
     listening: 'Listening...',
+    speaking: 'Speaking...',
     speechNotSupported: 'Your browser does not support voice chat.',
     greeting:
       'Hello, I am the V3RII AI support assistant. I can explain CRM, B2B, WMS and UTS products, and forward your technical support or demo request to the team by email.',
@@ -219,11 +225,19 @@ export default function SupportChatbot({ language, theme }: Props) {
   const [input, setInput] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [isListening, setIsListening] = useState(false)
+  const [isSpeaking, setIsSpeaking] = useState(false)
   const [voiceOutputEnabled, setVoiceOutputEnabled] = useState(false)
+  const [conversationModeEnabled, setConversationModeEnabled] = useState(false)
   const [speechSupported, setSpeechSupported] = useState(false)
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
   const sessionIdRef = useRef(createId())
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
+  const isListeningRef = useRef(false)
+  const isOpenRef = useRef(false)
+  const conversationModeEnabledRef = useRef(false)
+  const startListeningRef = useRef<() => void>(() => undefined)
+  const submitMessageRef = useRef<(value: string) => void>(() => undefined)
   const lastSpokenMessageIdRef = useRef<string | null>(null)
   const t = text[lead.language]
   const isLight = theme === 'light'
@@ -244,6 +258,7 @@ export default function SupportChatbot({ language, theme }: Props) {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel()
     }
+    setIsSpeaking(false)
   }, [])
 
   const speak = useCallback((value: string) => {
@@ -256,8 +271,20 @@ export default function SupportChatbot({ language, theme }: Props) {
     utterance.lang = lead.language === 'en' ? 'en-US' : 'tr-TR'
     utterance.rate = 0.96
     utterance.pitch = 1
+    utterance.voice =
+      availableVoices.find((voice) => voice.lang.toLowerCase().startsWith(lead.language === 'en' ? 'en' : 'tr')) ??
+      availableVoices.find((voice) => voice.default) ??
+      null
+    utterance.onstart = () => setIsSpeaking(true)
+    utterance.onend = () => {
+      setIsSpeaking(false)
+      if (conversationModeEnabledRef.current && isOpenRef.current) {
+        window.setTimeout(() => startListeningRef.current(), 250)
+      }
+    }
+    utterance.onerror = () => setIsSpeaking(false)
     window.speechSynthesis.speak(utterance)
-  }, [cleanSpeechText, lead.language])
+  }, [availableVoices, cleanSpeechText, lead.language])
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
@@ -267,6 +294,27 @@ export default function SupportChatbot({ language, theme }: Props) {
     const SpeechRecognition = (window as SpeechWindow).SpeechRecognition || (window as SpeechWindow).webkitSpeechRecognition
     setSpeechSupported(Boolean(SpeechRecognition && 'speechSynthesis' in window))
   }, [])
+
+  useEffect(() => {
+    if (!('speechSynthesis' in window)) return
+
+    const loadVoices = () => setAvailableVoices(window.speechSynthesis.getVoices())
+    loadVoices()
+    window.speechSynthesis.addEventListener('voiceschanged', loadVoices)
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', loadVoices)
+  }, [])
+
+  useEffect(() => {
+    isListeningRef.current = isListening
+  }, [isListening])
+
+  useEffect(() => {
+    isOpenRef.current = isOpen
+  }, [isOpen])
+
+  useEffect(() => {
+    conversationModeEnabledRef.current = conversationModeEnabled
+  }, [conversationModeEnabled])
 
   useEffect(() => {
     const lastMessage = messages[messages.length - 1]
@@ -281,6 +329,7 @@ export default function SupportChatbot({ language, theme }: Props) {
     if (!isOpen) {
       recognitionRef.current?.stop()
       setIsListening(false)
+      setConversationModeEnabled(false)
       stopSpeaking()
     }
   }, [isOpen, stopSpeaking])
@@ -316,6 +365,7 @@ export default function SupportChatbot({ language, theme }: Props) {
     recognitionRef.current?.stop()
     stopSpeaking()
     setIsListening(false)
+    setConversationModeEnabled(false)
     setStep('product')
     setLead(initialLead(nextLanguage))
     setMessages(createInitialMessages(nextLanguage))
@@ -523,17 +573,22 @@ export default function SupportChatbot({ language, theme }: Props) {
     window.setTimeout(() => handleFlow(trimmed), 160)
   }
 
+  useEffect(() => {
+    submitMessageRef.current = submitMessage
+  })
+
   const toggleVoiceOutput = () => {
     setVoiceOutputEnabled((prev) => {
       const next = !prev
       if (!next) {
+        setConversationModeEnabled(false)
         stopSpeaking()
       }
       return next
     })
   }
 
-  const toggleListening = () => {
+  const startListening = useCallback(() => {
     const SpeechRecognition = (window as SpeechWindow).SpeechRecognition || (window as SpeechWindow).webkitSpeechRecognition
 
     if (!SpeechRecognition) {
@@ -541,11 +596,7 @@ export default function SupportChatbot({ language, theme }: Props) {
       return
     }
 
-    if (isListening) {
-      recognitionRef.current?.stop()
-      setIsListening(false)
-      return
-    }
+    if (isListeningRef.current || isSending) return
 
     stopSpeaking()
     setVoiceOutputEnabled(true)
@@ -573,7 +624,7 @@ export default function SupportChatbot({ language, theme }: Props) {
       if (finalTranscript.trim()) {
         recognition.stop()
         setIsListening(false)
-        submitMessage(finalTranscript.trim())
+        submitMessageRef.current(finalTranscript.trim())
       }
     }
     recognition.onerror = () => {
@@ -585,6 +636,36 @@ export default function SupportChatbot({ language, theme }: Props) {
 
     setIsListening(true)
     recognition.start()
+  }, [isSending, lead.language, stopSpeaking, t.speechNotSupported])
+
+  useEffect(() => {
+    startListeningRef.current = startListening
+  }, [startListening])
+
+  const toggleListening = () => {
+    if (isListening) {
+      setConversationModeEnabled(false)
+      recognitionRef.current?.stop()
+      setIsListening(false)
+      return
+    }
+
+    setConversationModeEnabled(true)
+    startListening()
+  }
+
+  const toggleConversationMode = () => {
+    setConversationModeEnabled((prev) => {
+      const next = !prev
+      setVoiceOutputEnabled(next || voiceOutputEnabled)
+      if (next) {
+        startListening()
+      } else {
+        recognitionRef.current?.stop()
+        setIsListening(false)
+      }
+      return next
+    })
   }
 
   const quickActions = useMemo<QuickAction[]>(() => {
@@ -693,6 +774,14 @@ export default function SupportChatbot({ language, theme }: Props) {
                     aria-pressed={voiceOutputEnabled}
                   >
                     {voiceOutputEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+                  </button>
+                  <button
+                    onClick={toggleConversationMode}
+                    className={`p-1.5 transition hover:text-pink-400 ${conversationModeEnabled ? 'text-emerald-400' : 'text-cyan-400'} ${isLight ? 'hover:bg-pink-100' : 'hover:bg-white/10'}`}
+                    title={conversationModeEnabled ? t.conversationModeOn : t.conversationModeOff}
+                    aria-pressed={conversationModeEnabled}
+                  >
+                    <Headphones className="h-4 w-4" />
                   </button>
                   <button onClick={() => setIsOpen(false)} className={`p-1.5 text-cyan-400 transition hover:text-pink-400 ${isLight ? 'hover:bg-pink-100' : 'hover:bg-white/10'}`} title={t.minimize}>
                     <Minimize2 className="h-4 w-4" />
@@ -893,6 +982,12 @@ export default function SupportChatbot({ language, theme }: Props) {
                 <div className="mt-2 flex items-center gap-2 font-cyber text-[10px] uppercase tracking-[0.2em] text-emerald-400">
                   <span className="h-1.5 w-1.5 animate-pulse bg-emerald-400" />
                   {t.listening}
+                </div>
+              )}
+              {isSpeaking && (
+                <div className="mt-2 flex items-center gap-2 font-cyber text-[10px] uppercase tracking-[0.2em] text-cyan-400">
+                  <span className="h-1.5 w-1.5 animate-pulse bg-cyan-400" />
+                  {t.speaking}
                 </div>
               )}
             </div>
