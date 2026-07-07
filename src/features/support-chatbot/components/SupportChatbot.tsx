@@ -1022,10 +1022,17 @@ export default function SupportChatbot({ language, theme }: Props) {
     recognition.onerror = (event) => {
       clearVoiceTimers()
       recognitionRef.current = null
-      latestTranscriptRef.current = ''
       setIsListening(false)
 
+      const stableTranscript = latestTranscriptRef.current.trim()
+      if (stableTranscript) {
+        latestTranscriptRef.current = ''
+        submitMessageRef.current(stableTranscript)
+        return
+      }
+
       if (event?.error === 'not-allowed' || event?.error === 'service-not-allowed') {
+        latestTranscriptRef.current = ''
         stopListening(true)
         return
       }
@@ -1038,6 +1045,13 @@ export default function SupportChatbot({ language, theme }: Props) {
       clearVoiceTimers()
       setIsListening(false)
       recognitionRef.current = null
+
+      const stableTranscript = latestTranscriptRef.current.trim()
+      if (stableTranscript) {
+        latestTranscriptRef.current = ''
+        submitMessageRef.current(stableTranscript)
+        return
+      }
 
       if (suppressRecognitionRestartRef.current) {
         suppressRecognitionRestartRef.current = false
