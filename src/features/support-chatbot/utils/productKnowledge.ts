@@ -1,5 +1,36 @@
 import type { ProductKnowledge, SupportLanguage, SupportProductKey } from '../types/support-chatbot.types'
 
+export const companyKnowledge: Record<SupportLanguage, { title: string; summary: string; strengths: string[]; positioning: string }> = {
+  tr: {
+    title: 'V3RII Yazılım',
+    summary:
+      'V3RII; CRM, B2B, WMS, UTS ve AQUA ürün ailesiyle satış, bayi portalı, depo, ürün takip ve aquakültür operasyonlarını dijitalleştiren kurumsal yazılım ve otomasyon şirketidir.',
+    strengths: [
+      'Netsis/ERP entegrasyon deneyimi',
+      'Parametrik rol, yetki, onay ve kapsam yönetimi',
+      'Web tabanlı kurumsal operasyon panelleri',
+      'Raporlama, Power BI, mail, WhatsApp ve servis altyapısı',
+      'Yapay zeka destekli destek, bilgi tabanı ve operasyon otomasyonu'
+    ],
+    positioning:
+      'Ana hedefimiz işletmelerin dağınık satış, depo, bayi, mevzuat ve üretim süreçlerini tek merkezden izlenebilir, ölçülebilir ve entegre hale getirmektir.'
+  },
+  en: {
+    title: 'V3RII Software',
+    summary:
+      'V3RII is an enterprise software and automation company digitizing sales, dealer portals, warehouse, product tracking and aquaculture operations with its CRM, B2B, WMS, UTS and AQUA product family.',
+    strengths: [
+      'Netsis/ERP integration experience',
+      'Parametric role, permission, approval and scope management',
+      'Web-based enterprise operation panels',
+      'Reporting, Power BI, mail, WhatsApp and service infrastructure',
+      'AI-powered support, knowledge base and operation automation'
+    ],
+    positioning:
+      'Our main goal is to make fragmented sales, warehouse, dealer, compliance and production processes centralized, traceable, measurable and integrated.'
+  }
+}
+
 export const productKnowledge: Record<SupportLanguage, Record<SupportProductKey, ProductKnowledge>> = {
   tr: {
     crm: {
@@ -308,6 +339,102 @@ export const productKnowledge: Record<SupportLanguage, Record<SupportProductKey,
 }
 
 export const productKeys: SupportProductKey[] = ['crm', 'aqua', 'b2b', 'wms', 'uts']
+
+const solutionSignals: Record<SupportProductKey, string[]> = {
+  crm: [
+    'satış',
+    'satis',
+    'müşteri',
+    'musteri',
+    'teklif',
+    'sipariş',
+    'siparis',
+    'aktivite',
+    'ziyaret',
+    'rapor',
+    'sales',
+    'customer',
+    'quote',
+    'order',
+    'pipeline',
+    'activity'
+  ],
+  aqua: [
+    'aqua',
+    'balık',
+    'balik',
+    'kafes',
+    'yem',
+    'fcr',
+    'hasat',
+    'aquakültür',
+    'aquaculture',
+    'fish',
+    'cage',
+    'feeding',
+    'harvest'
+  ],
+  b2b: [
+    'b2b',
+    'bayi',
+    'portal',
+    'katalog',
+    'müşteri portalı',
+    'musteri portali',
+    'fiyat listesi',
+    'stok görünürlüğü',
+    'dealer',
+    'buyer',
+    'catalog',
+    'marketplace',
+    'payment'
+  ],
+  wms: [
+    'depo',
+    'stok',
+    'barkod',
+    'mal kabul',
+    'sevkiyat',
+    'paketleme',
+    'kalite',
+    'karantina',
+    'warehouse',
+    'barcode',
+    'shipment',
+    'inventory',
+    'quality',
+    'packing'
+  ],
+  uts: [
+    'uts',
+    'üts',
+    'ürün takip',
+    'urun takip',
+    'verme',
+    'alma',
+    'imha',
+    'ithalat',
+    'ihracat',
+    'product tracking',
+    'compliance',
+    'import',
+    'export',
+    'disposal'
+  ]
+}
+
+export const recommendProductsByNeed = (value: string) => {
+  const normalized = value.toLocaleLowerCase('tr-TR')
+  return productKeys
+    .map((key) => ({
+      key,
+      score: solutionSignals[key].reduce((total, signal) => total + (normalized.includes(signal) ? 1 : 0), 0)
+    }))
+    .filter((item) => item.score > 0)
+    .sort((first, second) => second.score - first.score)
+    .slice(0, 3)
+    .map((item) => item.key)
+}
 
 export const getProductByKeyword = (value: string): SupportProductKey | null => {
   const normalized = value.toLocaleLowerCase('tr-TR')

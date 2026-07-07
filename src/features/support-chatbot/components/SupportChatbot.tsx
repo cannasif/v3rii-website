@@ -28,7 +28,7 @@ import type {
   SupportProductKey,
   SupportStep
 } from '../types/support-chatbot.types'
-import { getProductByKeyword, productKeys, productKnowledge } from '../utils/productKnowledge'
+import { companyKnowledge, getProductByKeyword, productKeys, productKnowledge, recommendProductsByNeed } from '../utils/productKnowledge'
 import { createId, detectIntent, detectSupportLanguage, isEmail, shouldAskForHuman } from '../utils/supportChatbotFlow'
 
 type Props = {
@@ -91,6 +91,7 @@ const text = {
     greeting:
       'Merhaba, ben V3RII yapay zeka destek asistanı. CRM, B2B, WMS ve UTS ürünleri hakkında bilgi verebilir, teknik destek veya demo talebinizi ekibe mail olarak iletebilirim.',
     askProduct: 'Hangi ürün için destek almak istiyorsunuz?',
+    askNeed: 'İsterseniz ihtiyacınızı yazın; size en uygun V3RII ürününü önereyim.',
     askIntent: 'Bu ürün için ne yapmak istersiniz?',
     askName: 'Talebinizi ekibe iletebilmem için adınızı ve soyadınızı paylaşır mısınız?',
     askEmail: 'Size dönüş yapılacak e-posta adresini yazar mısınız?',
@@ -121,7 +122,10 @@ const text = {
       pricing: 'Fiyat/teklif',
       emailSupport: 'Mail ile destek aç',
       restart: 'Yeniden başla'
-    }
+    },
+    quickCompany: 'V3RII kimdir?',
+    quickRecommend: 'Hangi ürün bana uygun?',
+    recommendationTitle: 'İhtiyacınıza göre önerim'
   },
   en: {
     title: 'V3RII Support Assistant',
@@ -145,6 +149,7 @@ const text = {
     greeting:
       'Hello, I am the V3RII AI support assistant. I can explain CRM, B2B, WMS and UTS products, and forward your technical support or demo request to the team by email.',
     askProduct: 'Which product do you need help with?',
+    askNeed: 'You can describe your need and I can recommend the most relevant V3RII product.',
     askIntent: 'What would you like to do for this product?',
     askName: 'Please share your full name so I can forward your request.',
     askEmail: 'Please enter the email address where our team can reach you.',
@@ -175,7 +180,10 @@ const text = {
       pricing: 'Pricing/quote',
       emailSupport: 'Open email ticket',
       restart: 'Restart'
-    }
+    },
+    quickCompany: 'Who is V3RII?',
+    quickRecommend: 'Which product fits me?',
+    recommendationTitle: 'My recommendation for your need'
   }
 }
 
@@ -389,6 +397,58 @@ export default function SupportChatbot({ language, theme }: Props) {
     ].join('\n\n')
   }
 
+  const describeCompany = (activeLanguage = lead.language) => {
+    const company = companyKnowledge[activeLanguage]
+    return [
+      `${company.title}`,
+      company.summary,
+      `${activeLanguage === 'tr' ? 'Güçlü olduğumuz alanlar' : 'Core strengths'}:\n${company.strengths.map((item) => `- ${item}`).join('\n')}`,
+      company.positioning
+    ].join('\n\n')
+  }
+
+  const createCompanyCards = (activeLanguage = lead.language): ChatMessageCard[] => {
+    const company = companyKnowledge[activeLanguage]
+    return [
+      { title: activeLanguage === 'tr' ? 'Kısa tanım' : 'Short profile', body: company.summary },
+      { title: activeLanguage === 'tr' ? 'Güçlü alanlar' : 'Core strengths', body: company.strengths.join('\n') },
+      { title: activeLanguage === 'tr' ? 'Konumlandırma' : 'Positioning', body: company.positioning }
+    ]
+  }
+
+  const createRecommendationAnswer = (value: string, activeLanguage = lead.language) => {
+    const recommendations = recommendProductsByNeed(value)
+    if (recommendations.length === 0) {
+      return {
+        text:
+          activeLanguage === 'tr'
+            ? 'İhtiyacınızı biraz daha açarsanız doğru ürünü net önerebilirim. Örneğin satış/teklif, bayi portalı, depo/barkod, ÜTS/UTS ya da aquakültür operasyonu gibi bir süreçten bahsedebilirsiniz.'
+            : 'If you describe your need in a bit more detail, I can recommend the right product. For example, sales/quotes, dealer portal, warehouse/barcode, UTS compliance or aquaculture operations.',
+        cards: productKeys.map((key) => {
+          const product = productKnowledge[activeLanguage][key]
+          return { title: product.title, body: product.summary }
+        })
+      }
+    }
+
+    return {
+      text: [
+        text[activeLanguage].recommendationTitle,
+        ...recommendations.map((key, index) => {
+          const product = productKnowledge[activeLanguage][key]
+          return `${index + 1}. ${product.title}: ${product.summary}`
+        }),
+        activeLanguage === 'tr'
+          ? 'İsterseniz bu ürünlerden biri için demo veya teknik destek talebi açabilirim.'
+          : 'I can open a demo or technical support request for any of these products.'
+      ].join('\n\n'),
+      cards: recommendations.map((key) => {
+        const product = productKnowledge[activeLanguage][key]
+        return { title: product.title, body: `${product.idealFor}\n\n${product.features.join('\n')}` }
+      })
+    }
+  }
+
   const createProductCards = (productKey: SupportProductKey, activeLanguage = lead.language): ChatMessageCard[] => {
     const product = productKnowledge[activeLanguage][productKey]
     return [
@@ -498,8 +558,38 @@ export default function SupportChatbot({ language, theme }: Props) {
     const activeText = text[detectedLanguage]
     const productFromText = getProductByKeyword(value)
     const intentFromText = detectIntent(value)
+    const asksCompany =
+      /kimsiniz|siz kimsiniz|v3rii nedir|v3rii kim|firma|şirket|sirket|hakkınızda|hakkinda|who is|about v3rii|company/i.test(value)
+    const asksRecommendation =
+      /hangi ürün|hangi urun|bana uygun|ne öner|ne oner|ihtiyacım|ihtiyacim|çözüm öner|cozum oner|which product|recommend|fit me|suitable/i.test(value)
+    const asksIntegrations =
+      /netsis|erp|entegrasyon|integration|api|outlook|whatsapp|power bi|elogo|e-logo|pazar yeri|marketplace/i.test(value)
     const wantsPortfolio =
       /tüm|hepsi|ürünler|projeler|portfolio|all products|all projects/i.test(value) && !productFromText
+
+    if (asksCompany) {
+      addMessage('bot', describeCompany(detectedLanguage), 'company', createCompanyCards(detectedLanguage))
+      addMessage('bot', activeText.askNeed, 'advisor')
+      return
+    }
+
+    if (asksRecommendation) {
+      const recommendation = createRecommendationAnswer(value, detectedLanguage)
+      addMessage('bot', recommendation.text, 'advisor', recommendation.cards)
+      return
+    }
+
+    if (asksIntegrations && !productFromText) {
+      const integrationSummary =
+        detectedLanguage === 'tr'
+          ? 'V3RII ürün ailesinde entegrasyon omurgası güçlüdür: CRM, B2B, WMS, UTS ve AQUA tarafında Netsis/ERP referansları, mail/SMTP, Outlook, WhatsApp, Power BI, eLogo, pazar yeri ve arka plan job altyapıları ürün ihtiyacına göre kullanılır.'
+          : 'The V3RII product family has a strong integration backbone: CRM, B2B, WMS, UTS and AQUA can use Netsis/ERP references, mail/SMTP, Outlook, WhatsApp, Power BI, eLogo, marketplace and background job infrastructure depending on the product need.'
+      addMessage('bot', integrationSummary, 'integration', productKeys.map((key) => {
+        const product = productKnowledge[detectedLanguage][key]
+        return { title: product.title, body: product.integrations.join('\n') }
+      }))
+      return
+    }
 
     if (shouldAskForHuman(value)) {
       addMessage('bot', activeText.human)
@@ -671,6 +761,8 @@ export default function SupportChatbot({ language, theme }: Props) {
   const quickActions = useMemo<QuickAction[]>(() => {
     if (step === 'product') {
       return [
+        { label: t.quickCompany, value: t.quickCompany },
+        { label: t.quickRecommend, value: t.quickRecommend },
         { label: t.portfolio, value: t.portfolio },
         ...productKeys.map((key) => ({
           label: productKnowledge[lead.language][key].shortTitle,
@@ -694,7 +786,7 @@ export default function SupportChatbot({ language, theme }: Props) {
     }
 
     return []
-  }, [lead.language, step, t.actions, t.portfolio])
+  }, [lead.language, step, t.actions, t.portfolio, t.quickCompany, t.quickRecommend])
 
   const handleQuickAction = (action: QuickAction) => {
     if (step === 'submitted') {
