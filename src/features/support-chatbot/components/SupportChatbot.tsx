@@ -95,6 +95,8 @@ const text = {
     voiceWaiting: 'Hazırım. Konuşmaya başla dediğinizde dinlerim.',
     voiceListeningDetail: 'Konuşabilirsiniz, dinliyorum ve metne çeviriyorum.',
     voiceSpeakingDetail: 'Yanıtı seslendiriyorum; bitince tekrar dinlemeye geçebilirim.',
+    voiceManualContinue: 'iOS Safari’de tekrar dinlemek için devam et’e dokunun.',
+    continueListening: 'Devam et ve dinle',
     enableAudio: 'Sesi etkinleştir',
     audioBlocked: 'Mobil tarayıcı sesi kilitledi. Sesi etkinleştir’e bir kez dokunun.',
     listenAnswer: 'Cevabı dinle',
@@ -164,6 +166,8 @@ const text = {
     voiceWaiting: 'Ready. Press start speaking and I will listen.',
     voiceListeningDetail: 'You can speak now; I am listening and transcribing.',
     voiceSpeakingDetail: 'I am reading the answer; I can listen again afterwards.',
+    voiceManualContinue: 'On iOS Safari, tap continue to listen again.',
+    continueListening: 'Continue listening',
     enableAudio: 'Enable audio',
     audioBlocked: 'Your mobile browser blocked audio. Tap enable audio once.',
     listenAnswer: 'Listen to answer',
@@ -265,6 +269,8 @@ export default function SupportChatbot({ language, theme }: Props) {
   const [voicePersona, setVoicePersona] = useState<VoicePersona>('female')
   const [audioUnlocked, setAudioUnlocked] = useState(false)
   const [voicePlaybackBlocked, setVoicePlaybackBlocked] = useState(false)
+  const [awaitingVoiceContinue, setAwaitingVoiceContinue] = useState(false)
+  const [requiresManualVoiceTurn, setRequiresManualVoiceTurn] = useState(false)
   const [speechSupported, setSpeechSupported] = useState(false)
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -273,6 +279,7 @@ export default function SupportChatbot({ language, theme }: Props) {
   const isListeningRef = useRef(false)
   const isOpenRef = useRef(false)
   const conversationModeEnabledRef = useRef(false)
+  const requiresManualVoiceTurnRef = useRef(false)
   const startListeningRef = useRef<() => void>(() => undefined)
   const submitMessageRef = useRef<(value: string) => void>(() => undefined)
   const voiceTimeoutRef = useRef<number | null>(null)
@@ -382,8 +389,32 @@ export default function SupportChatbot({ language, theme }: Props) {
     setIsListening(false)
     if (disableConversationMode) {
       setConversationModeEnabled(false)
+      setAwaitingVoiceContinue(false)
     }
   }, [clearVoiceTimers])
+
+  const continueVoiceConversation = useCallback(() => {
+    setAwaitingVoiceContinue(false)
+    setVoicePlaybackBlocked(false)
+    setConversationModeEnabled(true)
+    setVoiceOutputEnabled(true)
+    void unlockAudioPlayback()
+    startListeningRef.current()
+  }, [unlockAudioPlayback])
+
+  const finishVoiceTurn = useCallback(() => {
+    setIsSpeaking(false)
+    setVoicePlaybackBlocked(false)
+
+    if (!conversationModeEnabledRef.current || !isOpenRef.current) return
+
+    if (requiresManualVoiceTurnRef.current) {
+      setAwaitingVoiceContinue(true)
+      return
+    }
+
+    window.setTimeout(() => startListeningRef.current(), 250)
+  }, [])
 
   const speakWithBrowser = useCallback((value: string, persona = voicePersona) => {
     if (!('speechSynthesis' in window)) {
@@ -404,19 +435,16 @@ export default function SupportChatbot({ language, theme }: Props) {
     utterance.pitch = voiceProfile.pitch
     utterance.voice = selectPreferredVoice(persona)
     utterance.onstart = () => setIsSpeaking(true)
-    utterance.onend = () => {
-      setIsSpeaking(false)
-      setVoicePlaybackBlocked(false)
-      if (conversationModeEnabledRef.current && isOpenRef.current) {
-        window.setTimeout(() => startListeningRef.current(), 250)
-      }
-    }
+    utterance.onend = finishVoiceTurn
     utterance.onerror = () => {
       setIsSpeaking(false)
       setVoicePlaybackBlocked(true)
+      if (conversationModeEnabledRef.current && requiresManualVoiceTurnRef.current) {
+        setAwaitingVoiceContinue(true)
+      }
     }
     window.speechSynthesis.speak(utterance)
-  }, [cleanSpeechText, getVoiceProfile, lead.language, selectPreferredVoice, voicePersona])
+  }, [cleanSpeechText, finishVoiceTurn, getVoiceProfile, lead.language, selectPreferredVoice, voicePersona])
 
   const speak = useCallback((value: string, persona = voicePersona) => {
     const cleaned = cleanSpeechText(value)
@@ -439,24 +467,21 @@ export default function SupportChatbot({ language, theme }: Props) {
         audio.volume = 1
         audio.src = `data:${result.contentType};base64,${result.audioBase64}`
         audio.onplay = () => setIsSpeaking(true)
-        audio.onended = () => {
-          setIsSpeaking(false)
-          setVoicePlaybackBlocked(false)
-          if (conversationModeEnabledRef.current && isOpenRef.current) {
-            window.setTimeout(() => startListeningRef.current(), 250)
-          }
-        }
+        audio.onended = finishVoiceTurn
         audio.onerror = () => {
           speakWithBrowser(value, persona)
         }
         void audio.play().catch(() => {
           setIsSpeaking(false)
           setVoicePlaybackBlocked(true)
+          if (conversationModeEnabledRef.current && requiresManualVoiceTurnRef.current) {
+            setAwaitingVoiceContinue(true)
+          }
           speakWithBrowser(value, persona)
         })
       })
       .catch(() => speakWithBrowser(value, persona))
-  }, [cleanSpeechText, lead.language, speakWithBrowser, voicePersona])
+  }, [cleanSpeechText, finishVoiceTurn, lead.language, speakWithBrowser, voicePersona])
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
@@ -465,6 +490,11 @@ export default function SupportChatbot({ language, theme }: Props) {
   useEffect(() => {
     const SpeechRecognition = (window as SpeechWindow).SpeechRecognition || (window as SpeechWindow).webkitSpeechRecognition
     setSpeechSupported(Boolean(SpeechRecognition && 'speechSynthesis' in window))
+
+    const userAgent = window.navigator.userAgent
+    const isIos = /iPad|iPhone|iPod/.test(userAgent) || (userAgent.includes('Mac') && navigator.maxTouchPoints > 1)
+    const isSafari = /^((?!chrome|android|crios|fxios|edgios).)*safari/i.test(userAgent)
+    setRequiresManualVoiceTurn(isIos && isSafari)
   }, [])
 
   useEffect(() => {
@@ -487,6 +517,10 @@ export default function SupportChatbot({ language, theme }: Props) {
   useEffect(() => {
     conversationModeEnabledRef.current = conversationModeEnabled
   }, [conversationModeEnabled])
+
+  useEffect(() => {
+    requiresManualVoiceTurnRef.current = requiresManualVoiceTurn
+  }, [requiresManualVoiceTurn])
 
   useEffect(() => {
     const lastMessage = messages[messages.length - 1]
@@ -534,6 +568,8 @@ export default function SupportChatbot({ language, theme }: Props) {
   const reset = (nextLanguage = lead.language) => {
     stopListening(true)
     stopSpeaking()
+    setAwaitingVoiceContinue(false)
+    setVoicePlaybackBlocked(false)
     setStep('product')
     setLead(initialLead(nextLanguage))
     setMessages(createInitialMessages(nextLanguage))
@@ -852,6 +888,8 @@ export default function SupportChatbot({ language, theme }: Props) {
     if (isListeningRef.current || isSending) return
 
     clearVoiceTimers()
+    setAwaitingVoiceContinue(false)
+    setVoicePlaybackBlocked(false)
     latestTranscriptRef.current = ''
     stopSpeaking()
     void unlockAudioPlayback()
@@ -947,6 +985,8 @@ export default function SupportChatbot({ language, theme }: Props) {
     stopSpeaking()
     setVoiceOutputEnabled(false)
     setConversationModeEnabled(false)
+    setAwaitingVoiceContinue(false)
+    setVoicePlaybackBlocked(false)
   }
 
   const toggleConversationMode = () => {
@@ -1003,8 +1043,16 @@ export default function SupportChatbot({ language, theme }: Props) {
   const PANEL_CLIP = 'polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px)'
   const CHIP_CLIP = 'polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px)'
   const LAUNCHER_CLIP = 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)'
-  const voiceSessionVisible = conversationModeEnabled || isListening || isSpeaking
-  const voiceStatusText = voicePlaybackBlocked ? t.audioBlocked : isSpeaking ? t.voiceSpeakingDetail : isListening ? t.voiceListeningDetail : t.voiceWaiting
+  const voiceSessionVisible = conversationModeEnabled || isListening || isSpeaking || awaitingVoiceContinue
+  const voiceStatusText = voicePlaybackBlocked
+    ? t.audioBlocked
+    : awaitingVoiceContinue
+      ? t.voiceManualContinue
+      : isSpeaking
+        ? t.voiceSpeakingDetail
+        : isListening
+          ? t.voiceListeningDetail
+          : t.voiceWaiting
 
   if (productModalOpen) return null
 
@@ -1220,6 +1268,10 @@ export default function SupportChatbot({ language, theme }: Props) {
                               stopListening(false)
                               return
                             }
+                            if (awaitingVoiceContinue) {
+                              continueVoiceConversation()
+                              return
+                            }
                             setConversationModeEnabled(true)
                             startListening()
                           }}
@@ -1231,7 +1283,7 @@ export default function SupportChatbot({ language, theme }: Props) {
                           }`}
                           style={{ clipPath: CHIP_CLIP }}
                         >
-                          {isListening ? t.stopVoiceInput : t.startConversation}
+                          {isListening ? t.stopVoiceInput : awaitingVoiceContinue ? t.continueListening : t.startConversation}
                         </button>
                         <div className="flex h-10 items-end gap-1 px-1" aria-hidden="true">
                           {[0, 1, 2, 3, 4].map((bar) => (
@@ -1271,6 +1323,20 @@ export default function SupportChatbot({ language, theme }: Props) {
                           style={{ clipPath: CHIP_CLIP }}
                         >
                           {t.enableAudio}
+                        </button>
+                      )}
+                      {awaitingVoiceContinue && !voicePlaybackBlocked && (
+                        <button
+                          type="button"
+                          onClick={continueVoiceConversation}
+                          className={`mt-2 border px-3 py-1.5 font-cyber text-[10px] font-bold uppercase tracking-wider transition ${
+                            isLight
+                              ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                              : 'border-emerald-400/40 bg-emerald-400/10 text-emerald-300 hover:bg-emerald-400/20'
+                          }`}
+                          style={{ clipPath: CHIP_CLIP }}
+                        >
+                          {t.continueListening}
                         </button>
                       )}
                     </div>
