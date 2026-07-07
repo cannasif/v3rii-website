@@ -41,6 +41,8 @@ type QuickAction = {
   value: string
 }
 
+type VoicePersona = 'female' | 'male'
+
 type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance
 
 type SpeechRecognitionInstance = {
@@ -84,6 +86,15 @@ const text = {
     voiceOutputOff: 'Sesli cevap kapalı',
     conversationModeOn: 'Konuşma modu açık',
     conversationModeOff: 'Konuşma modu kapalı',
+    voiceSessionTitle: 'AI sesli görüşme',
+    voiceSessionSubtitle: 'Konuşun, ben yazıya çevirip yanıtı seslendireyim.',
+    startConversation: 'Konuşmaya başla',
+    closeConversation: 'Konuşmayı kapat',
+    femaleVoice: 'Kadın sesi',
+    maleVoice: 'Erkek sesi',
+    voiceWaiting: 'Hazırım. Konuşmaya başla dediğinizde dinlerim.',
+    voiceListeningDetail: 'Konuşabilirsiniz, dinliyorum ve metne çeviriyorum.',
+    voiceSpeakingDetail: 'Yanıtı seslendiriyorum; bitince tekrar dinlemeye geçebilirim.',
     listenAnswer: 'Cevabı dinle',
     listening: 'Dinliyorum...',
     speaking: 'Cevap seslendiriliyor...',
@@ -142,6 +153,15 @@ const text = {
     voiceOutputOff: 'Voice replies off',
     conversationModeOn: 'Conversation mode on',
     conversationModeOff: 'Conversation mode off',
+    voiceSessionTitle: 'AI voice session',
+    voiceSessionSubtitle: 'Speak naturally; I will transcribe and read the answer.',
+    startConversation: 'Start speaking',
+    closeConversation: 'Close voice',
+    femaleVoice: 'Female voice',
+    maleVoice: 'Male voice',
+    voiceWaiting: 'Ready. Press start speaking and I will listen.',
+    voiceListeningDetail: 'You can speak now; I am listening and transcribing.',
+    voiceSpeakingDetail: 'I am reading the answer; I can listen again afterwards.',
     listenAnswer: 'Listen to answer',
     listening: 'Listening...',
     speaking: 'Speaking...',
@@ -236,6 +256,7 @@ export default function SupportChatbot({ language, theme }: Props) {
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [voiceOutputEnabled, setVoiceOutputEnabled] = useState(false)
   const [conversationModeEnabled, setConversationModeEnabled] = useState(false)
+  const [voicePersona, setVoicePersona] = useState<VoicePersona>('female')
   const [speechSupported, setSpeechSupported] = useState(false)
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -283,6 +304,22 @@ export default function SupportChatbot({ language, theme }: Props) {
     }
   }, [])
 
+  const selectPreferredVoice = useCallback(() => {
+    const languagePrefix = lead.language === 'en' ? 'en' : 'tr'
+    const localizedVoices = availableVoices.filter((voice) => voice.lang.toLowerCase().startsWith(languagePrefix))
+    const femaleSignals = /female|woman|zira|seda|yelda|aylin|filiz|elif|google türkçe|google turkce/i
+    const maleSignals = /male|man|cem|tolga|murat|kaan|erkek/i
+    const personaSignals = voicePersona === 'female' ? femaleSignals : maleSignals
+
+    return (
+      localizedVoices.find((voice) => personaSignals.test(voice.name)) ??
+      localizedVoices[voicePersona === 'male' ? 1 : 0] ??
+      localizedVoices[0] ??
+      availableVoices.find((voice) => voice.default) ??
+      null
+    )
+  }, [availableVoices, lead.language, voicePersona])
+
   const stopListening = useCallback((disableConversationMode = false) => {
     clearVoiceTimers()
     recognitionRef.current?.stop()
@@ -304,10 +341,7 @@ export default function SupportChatbot({ language, theme }: Props) {
     utterance.lang = lead.language === 'en' ? 'en-US' : 'tr-TR'
     utterance.rate = 0.96
     utterance.pitch = 1
-    utterance.voice =
-      availableVoices.find((voice) => voice.lang.toLowerCase().startsWith(lead.language === 'en' ? 'en' : 'tr')) ??
-      availableVoices.find((voice) => voice.default) ??
-      null
+    utterance.voice = selectPreferredVoice()
     utterance.onstart = () => setIsSpeaking(true)
     utterance.onend = () => {
       setIsSpeaking(false)
@@ -317,7 +351,7 @@ export default function SupportChatbot({ language, theme }: Props) {
     }
     utterance.onerror = () => setIsSpeaking(false)
     window.speechSynthesis.speak(utterance)
-  }, [availableVoices, cleanSpeechText, lead.language])
+  }, [cleanSpeechText, lead.language, selectPreferredVoice])
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
@@ -713,6 +747,7 @@ export default function SupportChatbot({ language, theme }: Props) {
     clearVoiceTimers()
     latestTranscriptRef.current = ''
     stopSpeaking()
+    lastSpokenMessageIdRef.current = messages[messages.length - 1]?.id ?? lastSpokenMessageIdRef.current
     setVoiceOutputEnabled(true)
 
     const recognition = new SpeechRecognition()
@@ -774,7 +809,7 @@ export default function SupportChatbot({ language, theme }: Props) {
         submitMessageRef.current(stableTranscript)
       }
     }, 12000)
-  }, [clearVoiceTimers, isSending, lead.language, stopListening, stopSpeaking, t.speechNotSupported])
+  }, [clearVoiceTimers, isSending, lead.language, messages, stopListening, stopSpeaking, t.speechNotSupported])
 
   useEffect(() => {
     startListeningRef.current = startListening
@@ -782,7 +817,7 @@ export default function SupportChatbot({ language, theme }: Props) {
 
   const toggleListening = () => {
     if (isListening) {
-      stopListening(true)
+      stopListening(false)
       return
     }
 
@@ -790,17 +825,23 @@ export default function SupportChatbot({ language, theme }: Props) {
     startListening()
   }
 
+  const closeConversationMode = () => {
+    stopListening(false)
+    stopSpeaking()
+    setVoiceOutputEnabled(false)
+    setConversationModeEnabled(false)
+  }
+
   const toggleConversationMode = () => {
-    setConversationModeEnabled((prev) => {
-      const next = !prev
-      setVoiceOutputEnabled(next || voiceOutputEnabled)
-      if (next) {
-        startListening()
-      } else {
-        stopListening(false)
-      }
-      return next
-    })
+    if (conversationModeEnabled) {
+      closeConversationMode()
+      return
+    }
+
+    setConversationModeEnabled(true)
+    lastSpokenMessageIdRef.current = messages[messages.length - 1]?.id ?? lastSpokenMessageIdRef.current
+    setVoiceOutputEnabled(true)
+    startListening()
   }
 
   const quickActions = useMemo<QuickAction[]>(() => {
@@ -844,6 +885,8 @@ export default function SupportChatbot({ language, theme }: Props) {
   const PANEL_CLIP = 'polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px)'
   const CHIP_CLIP = 'polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px)'
   const LAUNCHER_CLIP = 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)'
+  const voiceSessionVisible = conversationModeEnabled || isListening || isSpeaking
+  const voiceStatusText = isSpeaking ? t.voiceSpeakingDetail : isListening ? t.voiceListeningDetail : t.voiceWaiting
 
   if (productModalOpen) return null
 
@@ -969,6 +1012,134 @@ export default function SupportChatbot({ language, theme }: Props) {
               </div>
               </div>
             </div>
+
+            {voiceSessionVisible && (
+              <div className={`relative z-10 border-b px-4 py-3 ${isLight ? 'border-cyan-200/70 bg-cyan-50/70' : 'border-cyan-400/20 bg-cyan-400/[0.04]'}`}>
+                <div
+                  style={{ clipPath: CHIP_CLIP }}
+                  className={`relative overflow-hidden border p-3 ${
+                    isLight
+                      ? 'border-cyan-300/70 bg-white/88 shadow-[0_0_24px_rgba(34,211,238,0.16)]'
+                      : 'border-cyan-400/25 bg-[#070d15]/90 shadow-[0_0_28px_rgba(34,211,238,0.14)]'
+                  }`}
+                >
+                  <div
+                    className="pointer-events-none absolute inset-0 opacity-20"
+                    style={{ backgroundImage: 'linear-gradient(90deg, rgba(34,211,238,0.18), transparent 36%, rgba(236,72,153,0.14))' }}
+                  />
+                  <div className="relative flex items-start gap-3">
+                    <div className="relative grid h-14 w-14 shrink-0 place-items-center">
+                      <span
+                        className={`absolute inset-0 border ${isListening ? 'border-emerald-400/60' : isSpeaking ? 'border-cyan-400/60' : 'border-pink-400/50'}`}
+                        style={{ clipPath: 'circle(50%)', animation: 'cyberBotPing 1.8s ease-out infinite' }}
+                      />
+                      <span
+                        className={`absolute inset-2 border ${isListening ? 'border-emerald-400/45' : isSpeaking ? 'border-cyan-400/45' : 'border-pink-400/35'}`}
+                        style={{ clipPath: 'circle(50%)', animation: 'cyberBotPing 2.4s ease-out infinite' }}
+                      />
+                      <div
+                        className={`relative grid h-11 w-11 place-items-center border ${
+                          isLight
+                            ? 'border-cyan-300 bg-white text-cyan-700'
+                            : 'border-cyan-400/35 bg-cyan-400/10 text-cyan-200'
+                        }`}
+                        style={{ clipPath: 'circle(50%)' }}
+                      >
+                        <Headphones className="h-5 w-5" />
+                      </div>
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-cyber text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-400">
+                            {t.voiceSessionTitle}
+                          </p>
+                          <p className={`mt-1 text-xs leading-snug ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+                            {t.voiceSessionSubtitle}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={closeConversationMode}
+                          className={`shrink-0 border px-2 py-1 font-cyber text-[9px] uppercase tracking-wider transition ${
+                            isLight
+                              ? 'border-pink-300 bg-pink-50 text-pink-700 hover:bg-pink-100'
+                              : 'border-pink-500/35 bg-pink-500/10 text-pink-300 hover:bg-pink-500/20'
+                          }`}
+                          style={{ clipPath: CHIP_CLIP }}
+                        >
+                          {t.closeConversation}
+                        </button>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        {(['female', 'male'] as VoicePersona[]).map((persona) => (
+                          <button
+                            key={persona}
+                            type="button"
+                            onClick={() => setVoicePersona(persona)}
+                            className={`border px-2 py-1.5 font-cyber text-[10px] uppercase tracking-wider transition ${
+                              voicePersona === persona
+                                ? 'border-emerald-400 bg-emerald-400/12 text-emerald-300 shadow-[0_0_16px_rgba(52,211,153,0.16)]'
+                                : isLight
+                                  ? 'border-cyan-200 bg-white text-slate-600 hover:border-pink-300 hover:text-pink-700'
+                                  : 'border-cyan-400/20 bg-black/25 text-cyan-200 hover:border-pink-500/40 hover:text-pink-300'
+                            }`}
+                            style={{ clipPath: CHIP_CLIP }}
+                            aria-pressed={voicePersona === persona}
+                          >
+                            {persona === 'female' ? t.femaleVoice : t.maleVoice}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="mt-3 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isListening) {
+                              stopListening(false)
+                              return
+                            }
+                            setConversationModeEnabled(true)
+                            startListening()
+                          }}
+                          disabled={!speechSupported || isSending}
+                          className={`min-h-10 flex-1 border px-3 py-2 font-cyber text-[10px] font-bold uppercase tracking-wider transition disabled:cursor-not-allowed disabled:opacity-55 ${
+                            isListening
+                              ? 'border-red-400 bg-red-500/15 text-red-300'
+                              : 'border-cyan-400/45 bg-cyan-400/10 text-cyan-200 hover:border-pink-500/60 hover:text-pink-300'
+                          }`}
+                          style={{ clipPath: CHIP_CLIP }}
+                        >
+                          {isListening ? t.stopVoiceInput : t.startConversation}
+                        </button>
+                        <div className="flex h-10 items-end gap-1 px-1" aria-hidden="true">
+                          {[0, 1, 2, 3, 4].map((bar) => (
+                            <span
+                              key={bar}
+                              className={`w-1.5 ${isListening ? 'bg-emerald-400' : isSpeaking ? 'bg-cyan-400' : 'bg-pink-400/60'}`}
+                              style={{
+                                transformOrigin: 'bottom',
+                                height: `${12 + (bar % 3) * 7}px`,
+                                animation: voiceSessionVisible ? `cyberVoiceBar ${0.9 + bar * 0.12}s ease-in-out infinite` : undefined,
+                                animationDelay: `${bar * 80}ms`
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className={`mt-2 flex items-center gap-2 font-cyber text-[10px] uppercase tracking-[0.18em] ${isListening ? 'text-emerald-400' : isSpeaking ? 'text-cyan-400' : 'text-pink-400'}`}>
+                        <span className="h-1.5 w-1.5 animate-pulse bg-current" />
+                        {voiceStatusText}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Mesaj akışı */}
             <div ref={scrollRef} className="custom-scrollbar relative z-10 min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
@@ -1115,13 +1286,13 @@ export default function SupportChatbot({ language, theme }: Props) {
                   <Send className="h-4 w-4" />
                 </button>
               </form>
-              {isListening && (
+              {isListening && !voiceSessionVisible && (
                 <div className="mt-2 flex items-center gap-2 font-cyber text-[10px] uppercase tracking-[0.2em] text-emerald-400">
                   <span className="h-1.5 w-1.5 animate-pulse bg-emerald-400" />
                   {t.listening}
                 </div>
               )}
-              {isSpeaking && (
+              {isSpeaking && !voiceSessionVisible && (
                 <div className="mt-2 flex items-center gap-2 font-cyber text-[10px] uppercase tracking-[0.2em] text-cyan-400">
                   <span className="h-1.5 w-1.5 animate-pulse bg-cyan-400" />
                   {t.speaking}
