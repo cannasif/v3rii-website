@@ -82,9 +82,5 @@ export async function transcribeVoice(audio: Blob, language: string): Promise<{ 
   formData.append('audio', audio, `v3rii-voice.${extension}`)
   formData.append('language', language)
 
-  return api.post('/api/voice/transcribe', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data'
-    }
-  })
+  return api.post('/api/voice/transcribe', formData)
 }
