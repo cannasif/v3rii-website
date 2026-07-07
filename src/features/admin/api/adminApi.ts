@@ -1,10 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_V3RII_API_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:5263'
-
-type ApiResponse<T> = {
-  success: boolean
-  message: string
-  data: T
-}
+import { api, withAuth } from '../../../lib/axios'
 
 export type AdminAuth = {
   token: string
@@ -58,32 +52,16 @@ export type KnowledgeArticle = {
   isPublished: boolean
 }
 
-const request = async <T>(path: string, options: RequestInit = {}, token?: string) => {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers
-    }
-  })
-  const result = (await response.json()) as ApiResponse<T>
-  if (!response.ok || !result.success) {
-    throw new Error(result.message || 'API request failed')
-  }
-  return result.data
-}
-
 export const adminApi = {
   login: (email: string, password: string) =>
-    request<AdminAuth>('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
-  dashboard: (token: string) => request<Dashboard>('/api/support/tickets/dashboard', {}, token),
-  tickets: (token: string, params: URLSearchParams) => request<{ items: AdminTicket[]; totalCount: number; page: number; pageSize: number }>(`/api/support/tickets?${params}`, {}, token),
-  analytics: (token: string) => request<AnalyticsSummary>('/api/analytics/summary', {}, token),
-  knowledge: (product?: string) => request<KnowledgeArticle[]>(`/api/knowledge${product ? `?product=${product}` : ''}`),
+    api.post<AdminAuth>('/api/auth/login', { email, password }),
+  dashboard: (token: string) => api.get<Dashboard>('/api/support/tickets/dashboard', withAuth(token)),
+  tickets: (token: string, params: URLSearchParams) =>
+    api.get<{ items: AdminTicket[]; totalCount: number; page: number; pageSize: number }>(`/api/support/tickets?${params}`, withAuth(token)),
+  analytics: (token: string) => api.get<AnalyticsSummary>('/api/analytics/summary', withAuth(token)),
+  knowledge: (product?: string) => api.get<KnowledgeArticle[]>(`/api/knowledge${product ? `?product=${product}` : ''}`),
   createKnowledge: (token: string, payload: Omit<KnowledgeArticle, 'id'>) =>
-    request<KnowledgeArticle>('/api/knowledge', { method: 'POST', body: JSON.stringify(payload) }, token),
+    api.post<KnowledgeArticle>('/api/knowledge', payload, withAuth(token)),
   updateTicketStatus: (token: string, id: number, status: string, assignedToEmail?: string) =>
-    request<AdminTicket>(`/api/support/tickets/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status, assignedToEmail }) }, token)
+    api.patch<AdminTicket>(`/api/support/tickets/${id}/status`, { status, assignedToEmail }, withAuth(token))
 }
