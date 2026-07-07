@@ -89,6 +89,11 @@ const text = {
     conversationModeOff: 'Konuşma modu kapalı',
     voiceSessionTitle: 'AI sesli görüşme',
     voiceSessionSubtitle: 'Konuşun, ben yazıya çevirip yanıtı seslendireyim.',
+    iosDictationTitle: 'iPhone sesli yazma modu',
+    iosDictationHint:
+      'iOS tarayıcılarında canlı mikrofon API’si kararsızdır. Metin alanı açılınca iPhone klavyesindeki mikrofonla konuşup Gönder’e dokunun.',
+    iosDictationAction: 'iPhone dikteyi aç',
+    iosDictationInputHint: 'iPhone klavyesindeki mikrofonla konuşun; metin buraya düşünce Gönder’e dokunun.',
     startConversation: 'Konuşmaya başla',
     closeConversation: 'Konuşmayı kapat',
     femaleVoice: 'Kadın sesi',
@@ -162,6 +167,11 @@ const text = {
     conversationModeOff: 'Conversation mode off',
     voiceSessionTitle: 'AI voice session',
     voiceSessionSubtitle: 'Speak naturally; I will transcribe and read the answer.',
+    iosDictationTitle: 'iPhone dictation mode',
+    iosDictationHint:
+      'Live microphone recognition is unreliable in iOS browsers. After the text field opens, use the iPhone keyboard microphone and tap Send.',
+    iosDictationAction: 'Open iPhone dictation',
+    iosDictationInputHint: 'Use the iPhone keyboard microphone; when text appears here, tap Send.',
     startConversation: 'Start speaking',
     closeConversation: 'Close voice',
     femaleVoice: 'Female voice',
@@ -319,6 +329,7 @@ export default function SupportChatbot({ language, theme }: Props) {
   const [speechSupported, setSpeechSupported] = useState(false)
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const sessionIdRef = useRef(createId())
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
   const isListeningRef = useRef(false)
@@ -570,12 +581,11 @@ export default function SupportChatbot({ language, theme }: Props) {
 
     const userAgent = window.navigator.userAgent
     const isIos = /iPad|iPhone|iPod/.test(userAgent) || (userAgent.includes('Mac') && navigator.maxTouchPoints > 1)
-    const isSafari = /^((?!chrome|android|crios|fxios|edgios).)*safari/i.test(userAgent)
     const isMobileVoiceInput =
       /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(userAgent) ||
       (userAgent.includes('Mac') && navigator.maxTouchPoints > 1)
     isMobileVoiceInputRef.current = isMobileVoiceInput
-    setRequiresManualVoiceTurn(isIos && isSafari)
+    setRequiresManualVoiceTurn(isIos)
   }, [])
 
   useEffect(() => {
@@ -962,7 +972,32 @@ export default function SupportChatbot({ language, theme }: Props) {
     })
   }
 
+  const openManualVoiceInput = useCallback(() => {
+    const focusInput = () => {
+      const inputElement = inputRef.current
+      if (!inputElement) return
+      inputElement.focus()
+      const cursorPosition = inputElement.value.length
+      inputElement.setSelectionRange(cursorPosition, cursorPosition)
+    }
+
+    setConversationModeEnabled(true)
+    setVoiceOutputEnabled(true)
+    setAwaitingVoiceContinue(false)
+    setAwaitingTapToSpeak(false)
+    setVoicePlaybackBlocked(false)
+    manualSpeechUnlockedRef.current = true
+    void unlockAudioPlayback()
+    focusInput()
+    window.setTimeout(focusInput, 80)
+  }, [unlockAudioPlayback])
+
   const startListening = useCallback(() => {
+    if (requiresManualVoiceTurnRef.current) {
+      openManualVoiceInput()
+      return
+    }
+
     const SpeechRecognition = (window as SpeechWindow).SpeechRecognition || (window as SpeechWindow).webkitSpeechRecognition
 
     if (!SpeechRecognition) {
@@ -1093,7 +1128,17 @@ export default function SupportChatbot({ language, theme }: Props) {
         submitMessageRef.current(stableTranscript)
       }
     }, 12000)
-  }, [clearVoiceTimers, isSending, lead.language, messages, stopListening, stopSpeaking, t.speechNotSupported, unlockAudioPlayback])
+  }, [
+    clearVoiceTimers,
+    isSending,
+    lead.language,
+    messages,
+    openManualVoiceInput,
+    stopListening,
+    stopSpeaking,
+    t.speechNotSupported,
+    unlockAudioPlayback
+  ])
 
   useEffect(() => {
     startListeningRef.current = startListening
@@ -1111,6 +1156,10 @@ export default function SupportChatbot({ language, theme }: Props) {
 
     setConversationModeEnabled(true)
     manualSpeechUnlockedRef.current = true
+    if (requiresManualVoiceTurnRef.current) {
+      openManualVoiceInput()
+      return
+    }
     startListening()
   }
 
@@ -1162,6 +1211,10 @@ export default function SupportChatbot({ language, theme }: Props) {
     setVoiceOutputEnabled(true)
     manualSpeechUnlockedRef.current = true
     void unlockAudioPlayback()
+    if (requiresManualVoiceTurnRef.current) {
+      openManualVoiceInput()
+      return
+    }
     startListening()
   }
 
@@ -1384,10 +1437,10 @@ export default function SupportChatbot({ language, theme }: Props) {
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <p className="font-cyber text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-400">
-                            {t.voiceSessionTitle}
+                            {requiresManualVoiceTurn ? t.iosDictationTitle : t.voiceSessionTitle}
                           </p>
                           <p className={`mt-1 text-xs leading-snug ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
-                            {t.voiceSessionSubtitle}
+                            {requiresManualVoiceTurn ? t.iosDictationHint : t.voiceSessionSubtitle}
                           </p>
                         </div>
                         <button
@@ -1447,9 +1500,13 @@ export default function SupportChatbot({ language, theme }: Props) {
                             }
                             setConversationModeEnabled(true)
                             manualSpeechUnlockedRef.current = true
+                            if (requiresManualVoiceTurnRef.current) {
+                              openManualVoiceInput()
+                              return
+                            }
                             startListening()
                           }}
-                          disabled={!speechSupported || isSending}
+                          disabled={(!speechSupported && !requiresManualVoiceTurn) || isSending}
                           className={`min-h-10 flex-1 border px-3 py-2 font-cyber text-[10px] font-bold uppercase tracking-wider transition disabled:cursor-not-allowed disabled:opacity-55 ${
                             isListening
                               ? 'border-red-400 bg-red-500/15 text-red-300'
@@ -1457,7 +1514,15 @@ export default function SupportChatbot({ language, theme }: Props) {
                           }`}
                           style={{ clipPath: CHIP_CLIP }}
                         >
-                          {isListening ? t.stopVoiceInput : awaitingTapToSpeak ? t.speakAnswer : awaitingVoiceContinue ? t.continueListening : t.startConversation}
+                          {isListening
+                            ? t.stopVoiceInput
+                            : awaitingTapToSpeak
+                              ? t.speakAnswer
+                              : awaitingVoiceContinue
+                                ? t.continueListening
+                                : requiresManualVoiceTurn
+                                  ? t.iosDictationAction
+                                  : t.startConversation}
                         </button>
                         <div className="flex h-10 items-end gap-1 px-1" aria-hidden="true">
                           {[0, 1, 2, 3, 4].map((bar) => (
@@ -1636,8 +1701,21 @@ export default function SupportChatbot({ language, theme }: Props) {
                 className="flex items-end gap-2"
               >
                 <div className="relative flex-1">
+                  {requiresManualVoiceTurn && conversationModeEnabled && (
+                    <div
+                      className={`mb-2 border px-3 py-2 font-cyber text-[10px] uppercase leading-relaxed tracking-wider ${
+                        isLight
+                          ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                          : 'border-emerald-400/30 bg-emerald-400/[0.08] text-emerald-300'
+                      }`}
+                      style={{ clipPath: CHIP_CLIP }}
+                    >
+                      {t.iosDictationInputHint}
+                    </div>
+                  )}
                   <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-cyber text-xs text-pink-500">&gt;</span>
                   <textarea
+                    ref={inputRef}
                     value={input}
                     onChange={(event) => setInput(event.target.value)}
                     onKeyDown={(event) => {
@@ -1661,8 +1739,8 @@ export default function SupportChatbot({ language, theme }: Props) {
                   type="button"
                   onClick={toggleListening}
                   disabled={isSending}
-                  aria-label={isListening ? t.stopVoiceInput : t.voiceInput}
-                  title={isListening ? t.stopVoiceInput : t.voiceInput}
+                  aria-label={isListening ? t.stopVoiceInput : requiresManualVoiceTurn ? t.iosDictationAction : t.voiceInput}
+                  title={isListening ? t.stopVoiceInput : requiresManualVoiceTurn ? t.iosDictationAction : t.voiceInput}
                   aria-pressed={isListening}
                   style={{ clipPath: CHIP_CLIP }}
                   className={`grid h-11 w-11 shrink-0 place-items-center border transition disabled:cursor-not-allowed disabled:opacity-60 ${
