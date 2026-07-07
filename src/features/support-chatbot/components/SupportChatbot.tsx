@@ -7,12 +7,16 @@ import {
   ChevronDown,
   Headphones,
   Mail,
+  Mic,
+  MicOff,
   Minimize2,
   PackageCheck,
   Send,
+  Volume2,
+  VolumeX,
   X
 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Language, Theme } from '../../../App'
 import { askKnowledgeBase, sendSupportRequest, trackChatEvent } from '../api/supportRequestApi'
 import type {
@@ -37,6 +41,33 @@ type QuickAction = {
   value: string
 }
 
+type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance
+
+type SpeechRecognitionInstance = {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null
+  onerror: (() => void) | null
+  onend: (() => void) | null
+  start: () => void
+  stop: () => void
+}
+
+type SpeechRecognitionEventLike = {
+  results: ArrayLike<{
+    isFinal: boolean
+    0: {
+      transcript: string
+    }
+  }>
+}
+
+type SpeechWindow = Window & {
+  SpeechRecognition?: SpeechRecognitionConstructor
+  webkitSpeechRecognition?: SpeechRecognitionConstructor
+}
+
 const text = {
   tr: {
     title: 'V3RII Destek Asistanı',
@@ -47,6 +78,13 @@ const text = {
     minimize: 'Küçült',
     close: 'Kapat',
     reset: 'Yeni görüşme',
+    voiceInput: 'Sesli konuş',
+    stopVoiceInput: 'Dinlemeyi durdur',
+    voiceOutputOn: 'Sesli cevap açık',
+    voiceOutputOff: 'Sesli cevap kapalı',
+    listenAnswer: 'Cevabı dinle',
+    listening: 'Dinliyorum...',
+    speechNotSupported: 'Tarayıcınız sesli konuşma özelliğini desteklemiyor.',
     greeting:
       'Merhaba, ben V3RII yapay zeka destek asistanı. CRM, B2B, WMS ve UTS ürünleri hakkında bilgi verebilir, teknik destek veya demo talebinizi ekibe mail olarak iletebilirim.',
     askProduct: 'Hangi ürün için destek almak istiyorsunuz?',
@@ -91,6 +129,13 @@ const text = {
     minimize: 'Minimize',
     close: 'Close',
     reset: 'New chat',
+    voiceInput: 'Speak',
+    stopVoiceInput: 'Stop listening',
+    voiceOutputOn: 'Voice replies on',
+    voiceOutputOff: 'Voice replies off',
+    listenAnswer: 'Listen to answer',
+    listening: 'Listening...',
+    speechNotSupported: 'Your browser does not support voice chat.',
     greeting:
       'Hello, I am the V3RII AI support assistant. I can explain CRM, B2B, WMS and UTS products, and forward your technical support or demo request to the team by email.',
     askProduct: 'Which product do you need help with?',
@@ -173,14 +218,77 @@ export default function SupportChatbot({ language, theme }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>(() => createInitialMessages(initialLanguage))
   const [input, setInput] = useState('')
   const [isSending, setIsSending] = useState(false)
+  const [isListening, setIsListening] = useState(false)
+  const [voiceOutputEnabled, setVoiceOutputEnabled] = useState(false)
+  const [speechSupported, setSpeechSupported] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const sessionIdRef = useRef(createId())
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
+  const lastSpokenMessageIdRef = useRef<string | null>(null)
   const t = text[lead.language]
   const isLight = theme === 'light'
+
+  const cleanSpeechText = useCallback(
+    (value: string) =>
+      value
+        .replace(/>_/g, '')
+        .replace(/V3RII_BOT\s*>/gi, '')
+        .replace(/Ticket:/gi, lead.language === 'tr' ? 'Talep numarası:' : 'Ticket number:')
+        .replace(/[-•▸]/g, '. ')
+        .replace(/\s+/g, ' ')
+        .trim(),
+    [lead.language]
+  )
+
+  const stopSpeaking = useCallback(() => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel()
+    }
+  }, [])
+
+  const speak = useCallback((value: string) => {
+    if (!('speechSynthesis' in window)) return
+    const cleaned = cleanSpeechText(value)
+    if (!cleaned) return
+
+    window.speechSynthesis.cancel()
+    const utterance = new SpeechSynthesisUtterance(cleaned)
+    utterance.lang = lead.language === 'en' ? 'en-US' : 'tr-TR'
+    utterance.rate = 0.96
+    utterance.pitch = 1
+    window.speechSynthesis.speak(utterance)
+  }, [cleanSpeechText, lead.language])
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages, isOpen])
+
+  useEffect(() => {
+    const SpeechRecognition = (window as SpeechWindow).SpeechRecognition || (window as SpeechWindow).webkitSpeechRecognition
+    setSpeechSupported(Boolean(SpeechRecognition && 'speechSynthesis' in window))
+  }, [])
+
+  useEffect(() => {
+    const lastMessage = messages[messages.length - 1]
+    if (!isOpen || !voiceOutputEnabled || !lastMessage || lastMessage.sender === 'user') return
+    if (lastSpokenMessageIdRef.current === lastMessage.id) return
+
+    lastSpokenMessageIdRef.current = lastMessage.id
+    speak(lastMessage.text)
+  }, [isOpen, messages, speak, voiceOutputEnabled])
+
+  useEffect(() => {
+    if (!isOpen) {
+      recognitionRef.current?.stop()
+      setIsListening(false)
+      stopSpeaking()
+    }
+  }, [isOpen, stopSpeaking])
+
+  useEffect(() => () => {
+    recognitionRef.current?.stop()
+    stopSpeaking()
+  }, [stopSpeaking])
 
   // Diğer bileşenler (ör. Yukarı Çık butonu) chatbot durumunu bilsin
   useEffect(() => {
@@ -205,6 +313,9 @@ export default function SupportChatbot({ language, theme }: Props) {
   }
 
   const reset = (nextLanguage = lead.language) => {
+    recognitionRef.current?.stop()
+    stopSpeaking()
+    setIsListening(false)
     setStep('product')
     setLead(initialLead(nextLanguage))
     setMessages(createInitialMessages(nextLanguage))
@@ -412,6 +523,70 @@ export default function SupportChatbot({ language, theme }: Props) {
     window.setTimeout(() => handleFlow(trimmed), 160)
   }
 
+  const toggleVoiceOutput = () => {
+    setVoiceOutputEnabled((prev) => {
+      const next = !prev
+      if (!next) {
+        stopSpeaking()
+      }
+      return next
+    })
+  }
+
+  const toggleListening = () => {
+    const SpeechRecognition = (window as SpeechWindow).SpeechRecognition || (window as SpeechWindow).webkitSpeechRecognition
+
+    if (!SpeechRecognition) {
+      addMessage('system', t.speechNotSupported, 'voice')
+      return
+    }
+
+    if (isListening) {
+      recognitionRef.current?.stop()
+      setIsListening(false)
+      return
+    }
+
+    stopSpeaking()
+    setVoiceOutputEnabled(true)
+
+    const recognition = new SpeechRecognition()
+    recognitionRef.current = recognition
+    recognition.lang = lead.language === 'en' ? 'en-US' : 'tr-TR'
+    recognition.continuous = false
+    recognition.interimResults = true
+    recognition.onresult = (event) => {
+      let transcript = ''
+      let finalTranscript = ''
+
+      for (let index = 0; index < event.results.length; index += 1) {
+        const result = event.results[index]
+        transcript += result[0].transcript
+        if (result.isFinal) {
+          finalTranscript += result[0].transcript
+        }
+      }
+
+      const nextInput = transcript.trim()
+      setInput(nextInput)
+
+      if (finalTranscript.trim()) {
+        recognition.stop()
+        setIsListening(false)
+        submitMessage(finalTranscript.trim())
+      }
+    }
+    recognition.onerror = () => {
+      setIsListening(false)
+    }
+    recognition.onend = () => {
+      setIsListening(false)
+    }
+
+    setIsListening(true)
+    recognition.start()
+  }
+
   const quickActions = useMemo<QuickAction[]>(() => {
     if (step === 'product') {
       return [
@@ -511,6 +686,14 @@ export default function SupportChatbot({ language, theme }: Props) {
                   <button onClick={() => reset()} className={`p-1.5 text-cyan-400 transition hover:text-pink-400 ${isLight ? 'hover:bg-pink-100' : 'hover:bg-white/10'}`} title={t.reset}>
                     <PackageCheck className="h-4 w-4" />
                   </button>
+                  <button
+                    onClick={toggleVoiceOutput}
+                    className={`p-1.5 transition hover:text-pink-400 ${voiceOutputEnabled ? 'text-emerald-400' : 'text-cyan-400'} ${isLight ? 'hover:bg-pink-100' : 'hover:bg-white/10'}`}
+                    title={voiceOutputEnabled ? t.voiceOutputOn : t.voiceOutputOff}
+                    aria-pressed={voiceOutputEnabled}
+                  >
+                    {voiceOutputEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+                  </button>
                   <button onClick={() => setIsOpen(false)} className={`p-1.5 text-cyan-400 transition hover:text-pink-400 ${isLight ? 'hover:bg-pink-100' : 'hover:bg-white/10'}`} title={t.minimize}>
                     <Minimize2 className="h-4 w-4" />
                   </button>
@@ -551,6 +734,12 @@ export default function SupportChatbot({ language, theme }: Props) {
                   <Mail className="h-3 w-3" />
                   Support mail
                 </span>
+                {speechSupported && (
+                  <span style={{ clipPath: CHIP_CLIP }} className={`inline-flex items-center gap-1 border px-2.5 py-1 font-cyber uppercase tracking-wider ${isLight ? 'border-emerald-300/70 bg-emerald-50 text-emerald-700' : 'border-emerald-400/25 bg-emerald-400/5 text-emerald-300'}`}>
+                    <Headphones className="h-3 w-3" />
+                    Voice ready
+                  </span>
+                )}
               </div>
               </div>
             </div>
@@ -574,8 +763,20 @@ export default function SupportChatbot({ language, theme }: Props) {
                     }`}
                   >
                     {message.sender === 'bot' && (
-                      <div className="mb-1 font-cyber text-[9px] uppercase tracking-[0.22em] text-cyan-400">
-                        V3RII_BOT &gt;
+                      <div className="mb-1 flex items-center justify-between gap-2 font-cyber text-[9px] uppercase tracking-[0.22em] text-cyan-400">
+                        <span>V3RII_BOT &gt;</span>
+                        {'speechSynthesis' in window && (
+                          <button
+                            type="button"
+                            onClick={() => speak(message.text)}
+                            className="grid h-6 w-6 place-items-center border border-cyan-400/25 bg-cyan-400/5 text-cyan-300 transition hover:border-pink-400 hover:text-pink-300"
+                            title={t.listenAnswer}
+                            aria-label={t.listenAnswer}
+                            style={{ clipPath: CHIP_CLIP }}
+                          >
+                            <Volume2 className="h-3 w-3" />
+                          </button>
+                        )}
                       </div>
                     )}
                     {message.sender === 'system' && (
@@ -661,6 +862,24 @@ export default function SupportChatbot({ language, theme }: Props) {
                   />
                 </div>
                 <button
+                  type="button"
+                  onClick={toggleListening}
+                  disabled={isSending}
+                  aria-label={isListening ? t.stopVoiceInput : t.voiceInput}
+                  title={isListening ? t.stopVoiceInput : t.voiceInput}
+                  aria-pressed={isListening}
+                  style={{ clipPath: CHIP_CLIP }}
+                  className={`grid h-11 w-11 shrink-0 place-items-center border transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                    isListening
+                      ? 'border-red-400 bg-red-500/15 text-red-300 shadow-[0_0_22px_rgba(248,113,113,0.35)]'
+                      : isLight
+                        ? 'border-cyan-300 bg-white text-cyan-700 hover:border-pink-500 hover:text-pink-600'
+                        : 'border-cyan-400/25 bg-[#0a0f18] text-cyan-300 hover:border-pink-500/60 hover:text-pink-300'
+                  }`}
+                >
+                  {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                </button>
+                <button
                   type="submit"
                   disabled={isSending}
                   aria-label={t.send}
@@ -670,6 +889,12 @@ export default function SupportChatbot({ language, theme }: Props) {
                   <Send className="h-4 w-4" />
                 </button>
               </form>
+              {isListening && (
+                <div className="mt-2 flex items-center gap-2 font-cyber text-[10px] uppercase tracking-[0.2em] text-emerald-400">
+                  <span className="h-1.5 w-1.5 animate-pulse bg-emerald-400" />
+                  {t.listening}
+                </div>
+              )}
             </div>
           </motion.aside>
         )}
