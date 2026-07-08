@@ -306,7 +306,7 @@ const savePendingRequest = (lead: SupportLead, messages: ChatMessage[]) => {
   localStorage.setItem('v3riiPendingSupportRequests', JSON.stringify(current.slice(0, 50)))
 }
 
-const splitSpeechIntoChunks = (value: string, maxLength = 90) => {
+const splitSpeechIntoChunks = (value: string, maxLength = 180) => {
   const normalized = value.replace(/\s+/g, ' ').trim()
   if (!normalized) return []
 
@@ -445,7 +445,9 @@ export default function SupportChatbot({ language, theme }: Props) {
   const voiceTimeoutRef = useRef<number | null>(null)
   const voiceFinalFallbackRef = useRef<number | null>(null)
   const speechKeepAliveRef = useRef<number | null>(null)
+  const speechWatchdogRef = useRef<number | null>(null)
   const activeUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
+  const speechRunIdRef = useRef(0)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const mediaChunksRef = useRef<Blob[]>([])
@@ -470,7 +472,8 @@ export default function SupportChatbot({ language, theme }: Props) {
             ? `${user} at ${domain} nokta ${extension}`
             : `${user} at ${domain} dot ${extension}`
         )
-        .replace(/[-•▸]/g, '. ')
+        .replace(/[•▸]/g, '. ')
+        .replace(/\s[-–—]\s/g, '. ')
         .replace(/\s+/g, ' ')
         .trim(),
     [lead.language]
@@ -481,6 +484,10 @@ export default function SupportChatbot({ language, theme }: Props) {
       window.clearInterval(speechKeepAliveRef.current)
       speechKeepAliveRef.current = null
     }
+    if (speechWatchdogRef.current) {
+      window.clearTimeout(speechWatchdogRef.current)
+      speechWatchdogRef.current = null
+    }
   }, [])
 
   const stopSpeaking = useCallback(() => {
@@ -488,6 +495,7 @@ export default function SupportChatbot({ language, theme }: Props) {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel()
     }
+    speechRunIdRef.current += 1
     activeUtteranceRef.current = null
     outputAudioRef.current?.pause()
     setIsSpeaking(false)
@@ -640,16 +648,44 @@ export default function SupportChatbot({ language, theme }: Props) {
     clearSpeechKeepAlive()
     window.speechSynthesis.cancel()
     activeUtteranceRef.current = null
+    const runId = speechRunIdRef.current + 1
+    speechRunIdRef.current = runId
     const voiceProfile = getVoiceProfile(persona)
-    const chunks = splitSpeechIntoChunks(cleaned)
+    const chunks = cleaned.length <= 240 ? [cleaned] : splitSpeechIntoChunks(cleaned, 170)
     const selectedVoice = selectPreferredVoice(persona)
     let chunkIndex = 0
 
+    const isCurrentRun = () => speechRunIdRef.current === runId
+
+    const finishRun = () => {
+      if (!isCurrentRun()) return
+      activeUtteranceRef.current = null
+      clearSpeechKeepAlive()
+      finishVoiceTurn()
+    }
+
+    const armWatchdog = (chunk: string) => {
+      if (speechWatchdogRef.current) {
+        window.clearTimeout(speechWatchdogRef.current)
+      }
+      const expectedMs = Math.max(3500, Math.min(18000, chunk.length * 95))
+      speechWatchdogRef.current = window.setTimeout(() => {
+        if (!isCurrentRun()) return
+        activeUtteranceRef.current = null
+        chunkIndex += 1
+        if (chunks[chunkIndex]) {
+          speakNextChunk()
+          return
+        }
+        finishRun()
+      }, expectedMs)
+    }
+
     const speakNextChunk = () => {
+      if (!isCurrentRun()) return
       const chunk = chunks[chunkIndex]
       if (!chunk) {
-        clearSpeechKeepAlive()
-        finishVoiceTurn()
+        finishRun()
         return
       }
 
@@ -659,35 +695,58 @@ export default function SupportChatbot({ language, theme }: Props) {
       utterance.pitch = voiceProfile.pitch
       utterance.voice = selectedVoice
       utterance.onstart = () => {
+        if (!isCurrentRun()) return
         activeUtteranceRef.current = utterance
         manualSpeechUnlockedRef.current = true
         setAwaitingTapToSpeak(false)
         setVoicePlaybackBlocked(false)
         setIsSpeaking(true)
-        if (!speechKeepAliveRef.current) {
+        armWatchdog(chunk)
+        if (chunk.length > 220 && !speechKeepAliveRef.current) {
           speechKeepAliveRef.current = window.setInterval(() => {
-            window.speechSynthesis.resume()
-          }, 7000)
+            if (isCurrentRun()) {
+              window.speechSynthesis.resume()
+            }
+          }, 9000)
         }
       }
       utterance.onend = () => {
+        if (!isCurrentRun()) return
+        if (speechWatchdogRef.current) {
+          window.clearTimeout(speechWatchdogRef.current)
+          speechWatchdogRef.current = null
+        }
         activeUtteranceRef.current = null
         chunkIndex += 1
-        window.setTimeout(speakNextChunk, 140)
+        window.setTimeout(speakNextChunk, 180)
       }
-      utterance.onerror = () => {
+      utterance.onerror = (event) => {
+        if (!isCurrentRun()) return
+        if (speechWatchdogRef.current) {
+          window.clearTimeout(speechWatchdogRef.current)
+          speechWatchdogRef.current = null
+        }
         activeUtteranceRef.current = null
-        chunkIndex += 1
-        if (chunks[chunkIndex]) {
-          window.setTimeout(speakNextChunk, 160)
+
+        const errorName = typeof event === 'object' && event && 'error' in event ? String(event.error) : ''
+        if (errorName === 'interrupted' || errorName === 'canceled') {
+          finishRun()
           return
         }
 
-        clearSpeechKeepAlive()
-        finishVoiceTurn()
+        chunkIndex += 1
+        if (chunks[chunkIndex]) {
+          window.setTimeout(speakNextChunk, 220)
+          return
+        }
+
+        finishRun()
       }
       activeUtteranceRef.current = utterance
-      window.speechSynthesis.speak(utterance)
+      window.setTimeout(() => {
+        if (!isCurrentRun()) return
+        window.speechSynthesis.speak(utterance)
+      }, 40)
     }
 
     speakNextChunk()
