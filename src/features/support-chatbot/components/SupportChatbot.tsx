@@ -306,7 +306,7 @@ const savePendingRequest = (lead: SupportLead, messages: ChatMessage[]) => {
   localStorage.setItem('v3riiPendingSupportRequests', JSON.stringify(current.slice(0, 50)))
 }
 
-const splitSpeechIntoChunks = (value: string, maxLength = 180) => {
+const splitSpeechIntoChunks = (value: string, maxLength = 90) => {
   const normalized = value.replace(/\s+/g, ' ').trim()
   if (!normalized) return []
 
@@ -445,6 +445,7 @@ export default function SupportChatbot({ language, theme }: Props) {
   const voiceTimeoutRef = useRef<number | null>(null)
   const voiceFinalFallbackRef = useRef<number | null>(null)
   const speechKeepAliveRef = useRef<number | null>(null)
+  const activeUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const mediaChunksRef = useRef<Blob[]>([])
@@ -464,6 +465,11 @@ export default function SupportChatbot({ language, theme }: Props) {
         .replace(/>_/g, '')
         .replace(/V3RII_BOT\s*>/gi, '')
         .replace(/Ticket:/gi, lead.language === 'tr' ? 'Talep numarası:' : 'Ticket number:')
+        .replace(/([\p{L}\d._%+-]+)@([\p{L}\d.-]+)\.([a-z]{2,})/giu, (_match, user, domain, extension) =>
+          lead.language === 'tr'
+            ? `${user} at ${domain} nokta ${extension}`
+            : `${user} at ${domain} dot ${extension}`
+        )
         .replace(/[-•▸]/g, '. ')
         .replace(/\s+/g, ' ')
         .trim(),
@@ -482,6 +488,7 @@ export default function SupportChatbot({ language, theme }: Props) {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel()
     }
+    activeUtteranceRef.current = null
     outputAudioRef.current?.pause()
     setIsSpeaking(false)
   }, [clearSpeechKeepAlive])
@@ -632,6 +639,7 @@ export default function SupportChatbot({ language, theme }: Props) {
 
     clearSpeechKeepAlive()
     window.speechSynthesis.cancel()
+    activeUtteranceRef.current = null
     const voiceProfile = getVoiceProfile(persona)
     const chunks = splitSpeechIntoChunks(cleaned)
     const selectedVoice = selectPreferredVoice(persona)
@@ -651,6 +659,7 @@ export default function SupportChatbot({ language, theme }: Props) {
       utterance.pitch = voiceProfile.pitch
       utterance.voice = selectedVoice
       utterance.onstart = () => {
+        activeUtteranceRef.current = utterance
         manualSpeechUnlockedRef.current = true
         setAwaitingTapToSpeak(false)
         setVoicePlaybackBlocked(false)
@@ -662,20 +671,22 @@ export default function SupportChatbot({ language, theme }: Props) {
         }
       }
       utterance.onend = () => {
+        activeUtteranceRef.current = null
         chunkIndex += 1
-        window.setTimeout(speakNextChunk, 80)
+        window.setTimeout(speakNextChunk, 140)
       }
       utterance.onerror = () => {
-        clearSpeechKeepAlive()
-        setIsSpeaking(false)
-        setVoicePlaybackBlocked(true)
-        if (conversationModeEnabledRef.current && isOpenRef.current) {
-          setAwaitingTapToSpeak(false)
-          window.setTimeout(() => startListeningRef.current(), 650)
-        } else if (requiresManualVoiceTurnRef.current) {
-          setAwaitingTapToSpeak(true)
+        activeUtteranceRef.current = null
+        chunkIndex += 1
+        if (chunks[chunkIndex]) {
+          window.setTimeout(speakNextChunk, 160)
+          return
         }
+
+        clearSpeechKeepAlive()
+        finishVoiceTurn()
       }
+      activeUtteranceRef.current = utterance
       window.speechSynthesis.speak(utterance)
     }
 
