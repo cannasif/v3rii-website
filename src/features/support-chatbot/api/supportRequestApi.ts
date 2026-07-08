@@ -100,7 +100,17 @@ export async function synthesizeVoice(text: string, language: string, persona: '
 
 export async function transcribeVoice(audio: Blob, language: string): Promise<{ enabled: boolean; success: boolean; text?: string; message?: string }> {
   const formData = new FormData()
-  const extension = audio.type.includes('mp4') ? 'mp4' : audio.type.includes('wav') ? 'wav' : 'webm'
+  const extension = audio.type.includes('m4a') || audio.type.includes('mp4')
+    ? 'm4a'
+    : audio.type.includes('aac')
+      ? 'aac'
+      : audio.type.includes('mpeg') || audio.type.includes('mp3')
+        ? 'mp3'
+        : audio.type.includes('ogg')
+          ? 'ogg'
+          : audio.type.includes('wav')
+            ? 'wav'
+            : 'webm'
   formData.append('audio', audio, `v3rii-voice.${extension}`)
   formData.append('language', language)
 

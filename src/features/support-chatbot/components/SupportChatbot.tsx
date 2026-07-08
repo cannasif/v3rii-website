@@ -96,15 +96,15 @@ const text = {
     voiceSessionSubtitle: 'Konuşun, ben dinleyip yanıtı seslendireyim.',
     iosVoiceTitle: 'iPhone sesli görüşme',
     iosVoiceHint:
-      'iPhone’da tarayıcı konuşmanızı güvenli şekilde dinler, ardından V3RII API cevabı hazırlar.',
-    iosVoiceAction: 'Konuşmaya başla',
-    iosVoiceInputHint: 'Dinliyorum. Konuşmanız bitince kaydı durdurun; ben düşünüp cevabı hazırlayayım.',
+      'iPhone’da ses kaydınızı seçin; V3RII API güvenli şekilde metne çevirip cevabı hazırlar.',
+    iosVoiceAction: 'Ses kaydı gönder',
+    iosVoiceInputHint: 'iPhone ses kaydı ekranı açılır. Kaydı bitirip onayladığınızda cevabı hazırlayayım.',
     iosVoiceFallbackAction: 'Ses dosyası kaydet/seç',
     stopRecording: 'Konuşmayı bitir',
     transcribing: 'Düşünüyorum...',
     transcriptionUnavailable:
       'Sizi dinledim fakat sunucuda sesli yanıt motoru henüz aktif değil. Lütfen şimdilik mesajınızı yazarak gönderin.',
-    transcriptionFailed: 'Sesli mesaj işlenemedi. Lütfen tekrar deneyin veya mesajınızı yazın.',
+    transcriptionFailed: 'Ses algılanamadı. Lütfen 2-3 saniye net konuşup tekrar deneyin veya mesajınızı yazın.',
     startConversation: 'Konuşmaya başla',
     closeConversation: 'Konuşmayı kapat',
     femaleVoice: 'Kadın sesi',
@@ -188,15 +188,15 @@ const text = {
     voiceSessionSubtitle: 'Speak naturally; I will listen and read the answer.',
     iosVoiceTitle: 'iPhone voice session',
     iosVoiceHint:
-      'On iPhone, the browser securely listens to your turn, then the V3RII API prepares the answer.',
-    iosVoiceAction: 'Start speaking',
-    iosVoiceInputHint: 'Listening. Stop when you finish; I will think and prepare the answer.',
+      'On iPhone, choose a voice recording; the V3RII API securely transcribes it and prepares the answer.',
+    iosVoiceAction: 'Send voice recording',
+    iosVoiceInputHint: 'The iPhone voice recorder opens. When you approve the recording, I will prepare the answer.',
     iosVoiceFallbackAction: 'Record/select audio',
     stopRecording: 'Finish speaking',
     transcribing: 'Thinking...',
     transcriptionUnavailable:
       'I listened, but the server-side voice engine is not enabled yet. Please type your message for now.',
-    transcriptionFailed: 'Voice message could not be processed. Please try again or type your message.',
+    transcriptionFailed: 'I could not detect speech. Please speak clearly for 2-3 seconds and try again or type your message.',
     startConversation: 'Start speaking',
     closeConversation: 'Close voice',
     femaleVoice: 'Female voice',
@@ -1326,7 +1326,7 @@ export default function SupportChatbot({ language, theme }: Props) {
     const activeText = text[detectedLanguage]
     const productFromText = getProductByKeyword(value)
     const intentFromText = detectIntent(value)
-    const asksCompany =
+    const asksCompany = !productFromText &&
       /kimsiniz|siz kimsiniz|v3rii nedir|v3rii kim|firma|şirket|sirket|hakkınızda|hakkinda|who is|about v3rii|company/i.test(value)
     const asksRecommendation =
       /hangi ürün|hangi urun|bana uygun|ne öner|ne oner|ihtiyacım|ihtiyacim|çözüm öner|cozum oner|which product|recommend|fit me|suitable/i.test(value)
@@ -1474,7 +1474,16 @@ export default function SupportChatbot({ language, theme }: Props) {
     clearVoiceRecordingTimer()
     const recorder = mediaRecorderRef.current
     if (recorder && recorder.state !== 'inactive') {
-      recorder.stop()
+      try {
+        recorder.requestData()
+      } catch {
+        // Some browsers do not support flushing recorder data explicitly.
+      }
+      window.setTimeout(() => {
+        if (mediaRecorderRef.current === recorder && recorder.state !== 'inactive') {
+          recorder.stop()
+        }
+      }, 120)
       return
     }
 
@@ -1484,14 +1493,19 @@ export default function SupportChatbot({ language, theme }: Props) {
   }, [clearVoiceRecordingTimer, stopMediaStream])
 
   const processVoiceAudio = useCallback((audio: Blob, source: 'media-recorder' | 'native-capture') => {
-    if (audio.size <= 0) {
+    if (audio.size < 1200) {
       void trackChatEvent('voice_upload_skipped_empty', { sessionId: sessionIdRef.current, metadata: { source } })
       addMessage('system', t.transcriptionFailed, 'voice')
       return
     }
 
     setIsTranscribingVoice(true)
-    convertRecordedAudioToWav(audio)
+    const shouldUseOriginalAudio =
+      source === 'native-capture' ||
+      requiresManualVoiceTurnRef.current ||
+      /mp4|m4a|aac|mpeg|ogg/i.test(audio.type)
+
+    Promise.resolve(shouldUseOriginalAudio ? audio : convertRecordedAudioToWav(audio))
       .catch(() => audio)
       .then((preparedAudio) => {
         void trackChatEvent('voice_upload_start', {
@@ -1533,6 +1547,23 @@ export default function SupportChatbot({ language, theme }: Props) {
   const startRecordedVoiceInput = useCallback(async () => {
     if (isRecordingVoice) {
       stopRecordedVoiceInput()
+      return
+    }
+
+    if (requiresManualVoiceTurnRef.current) {
+      setConversationModeEnabled(true)
+      setVoiceOutputEnabled(true)
+      setAwaitingVoiceContinue(false)
+      setAwaitingTapToSpeak(false)
+      setVoicePlaybackBlocked(false)
+      manualSpeechUnlockedRef.current = true
+      stopSpeaking()
+      void unlockAudioPlayback()
+      void trackChatEvent('voice_native_capture_open', {
+        sessionId: sessionIdRef.current,
+        metadata: { reason: 'ios-primary', userAgent: window.navigator.userAgent }
+      })
+      nativeVoiceInputRef.current?.click()
       return
     }
 
@@ -1611,7 +1642,7 @@ export default function SupportChatbot({ language, theme }: Props) {
         processVoiceAudio(audio, 'media-recorder')
       }
 
-      recorder.start()
+      recorder.start(1000)
       setIsRecordingVoice(true)
       voiceRecordingTimeoutRef.current = window.setTimeout(() => {
         if (mediaRecorderRef.current?.state === 'recording') {
