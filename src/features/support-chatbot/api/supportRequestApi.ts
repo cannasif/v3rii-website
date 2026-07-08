@@ -84,6 +84,20 @@ export async function askKnowledgeBase(product: SupportProductKey | undefined, q
   })
 }
 
+export async function synthesizeVoice(text: string, language: string, persona: 'female' | 'male'): Promise<{
+  enabled: boolean
+  audioBase64?: string
+  contentType: string
+  provider: string
+  voiceName: string
+}> {
+  return api.post('/api/voice/synthesize', {
+    text,
+    language,
+    persona
+  })
+}
+
 export async function transcribeVoice(audio: Blob, language: string): Promise<{ enabled: boolean; success: boolean; text?: string; message?: string }> {
   const formData = new FormData()
   const extension = audio.type.includes('mp4') ? 'mp4' : audio.type.includes('wav') ? 'wav' : 'webm'

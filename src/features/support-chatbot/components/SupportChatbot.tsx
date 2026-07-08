@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Language, Theme } from '../../../App'
-import { askKnowledgeBase, sendSupportRequest, trackChatEvent, transcribeVoice } from '../api/supportRequestApi'
+import { askKnowledgeBase, sendSupportRequest, synthesizeVoice, trackChatEvent, transcribeVoice } from '../api/supportRequestApi'
 import type {
   ChatMessage,
   ChatMessageCard,
@@ -498,6 +498,7 @@ export default function SupportChatbot({ language, theme }: Props) {
     speechRunIdRef.current += 1
     activeUtteranceRef.current = null
     outputAudioRef.current?.pause()
+    outputAudioRef.current?.removeAttribute('src')
     setIsSpeaking(false)
   }, [clearSpeechKeepAlive])
 
@@ -752,12 +753,15 @@ export default function SupportChatbot({ language, theme }: Props) {
     speakNextChunk()
   }, [clearSpeechKeepAlive, cleanSpeechText, finishVoiceTurn, getVoiceProfile, lead.language, selectPreferredVoice, voicePersona])
 
-  const speak = useCallback((value: string, persona = voicePersona) => {
+  const speak = useCallback(async (value: string, persona = voicePersona) => {
     const cleaned = cleanSpeechText(value)
     if (!cleaned) return
 
+    const runId = speechRunIdRef.current + 1
+    speechRunIdRef.current = runId
     window.speechSynthesis?.cancel()
     outputAudioRef.current?.pause()
+    outputAudioRef.current?.removeAttribute('src')
     lastSpokenTextRef.current = value
 
     if (requiresManualVoiceTurnRef.current && !manualSpeechUnlockedRef.current) {
@@ -771,8 +775,43 @@ export default function SupportChatbot({ language, theme }: Props) {
       return
     }
 
+    if (requiresManualVoiceTurnRef.current) {
+      speakWithBrowser(value, persona)
+      return
+    }
+
+    try {
+      const result = await synthesizeVoice(cleaned, lead.language, persona)
+      if (speechRunIdRef.current !== runId) return
+      if (result.enabled && result.audioBase64) {
+        const audio = outputAudioRef.current ?? new Audio()
+        outputAudioRef.current = audio
+        audio.pause()
+        audio.src = `data:${result.contentType || 'audio/mpeg'};base64,${result.audioBase64}`
+        audio.onplay = () => {
+          if (speechRunIdRef.current !== runId) return
+          setIsSpeaking(true)
+          setVoicePlaybackBlocked(false)
+          setAwaitingTapToSpeak(false)
+        }
+        audio.onended = () => {
+          if (speechRunIdRef.current !== runId) return
+          finishVoiceTurn()
+        }
+        audio.onerror = () => {
+          if (speechRunIdRef.current !== runId) return
+          speakWithBrowser(value, persona)
+        }
+        await audio.play()
+        return
+      }
+    } catch {
+      // Browser TTS remains the free/local fallback when API synthesis is disabled or unreachable.
+    }
+
+    if (speechRunIdRef.current !== runId) return
     speakWithBrowser(value, persona)
-  }, [cleanSpeechText, speakWithBrowser, voicePersona])
+  }, [cleanSpeechText, finishVoiceTurn, lead.language, speakWithBrowser, voicePersona])
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
@@ -1782,7 +1821,7 @@ export default function SupportChatbot({ language, theme }: Props) {
     manualSpeechUnlockedRef.current = true
     setAwaitingTapToSpeak(false)
     setVoicePlaybackBlocked(false)
-    speakWithBrowser(lastAnswer, voicePersona)
+    void speak(lastAnswer)
   }
 
   const changeVoicePersona = (persona: VoicePersona) => {
@@ -1791,11 +1830,7 @@ export default function SupportChatbot({ language, theme }: Props) {
     void unlockAudioPlayback()
 
     if (isSpeaking && lastSpokenTextRef.current) {
-      if (requiresManualVoiceTurnRef.current) {
-        window.setTimeout(() => speakWithBrowser(lastSpokenTextRef.current, persona), 80)
-      } else {
-        window.setTimeout(() => speak(lastSpokenTextRef.current, persona), 80)
-      }
+      window.setTimeout(() => speak(lastSpokenTextRef.current, persona), 80)
     }
   }
 
@@ -2301,7 +2336,7 @@ export default function SupportChatbot({ language, theme }: Props) {
                               if (requiresManualVoiceTurnRef.current) {
                                 setAwaitingTapToSpeak(false)
                                 setVoicePlaybackBlocked(false)
-                                speakWithBrowser(message.text, voicePersona)
+                                void speak(message.text)
                                 return
                               }
                               void unlockAudioPlayback().finally(() => speak(message.text))
