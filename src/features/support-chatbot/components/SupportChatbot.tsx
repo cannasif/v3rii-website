@@ -1093,6 +1093,10 @@ export default function SupportChatbot({ language, theme }: Props) {
     }
 
     if (!navigator.mediaDevices?.getUserMedia || !('MediaRecorder' in window)) {
+      void trackChatEvent('voice_record_unsupported', {
+        sessionId: sessionIdRef.current,
+        metadata: { userAgent: window.navigator.userAgent }
+      })
       addMessage('system', t.speechNotSupported, 'voice')
       return
     }
@@ -1117,6 +1121,13 @@ export default function SupportChatbot({ language, theme }: Props) {
       })
       const mimeType = selectRecordingMimeType()
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
+      void trackChatEvent('voice_record_start', {
+        sessionId: sessionIdRef.current,
+        metadata: {
+          mimeType: recorder.mimeType || mimeType || 'browser-default',
+          userAgent: window.navigator.userAgent
+        }
+      })
 
       mediaStreamRef.current = stream
       mediaRecorderRef.current = recorder
@@ -1128,6 +1139,10 @@ export default function SupportChatbot({ language, theme }: Props) {
       }
 
       recorder.onerror = () => {
+        void trackChatEvent('voice_record_error', {
+          sessionId: sessionIdRef.current,
+          metadata: { mimeType: recorder.mimeType || mimeType || 'unknown' }
+        })
         clearVoiceRecordingTimer()
         stopMediaStream()
         mediaRecorderRef.current = null
@@ -1145,7 +1160,12 @@ export default function SupportChatbot({ language, theme }: Props) {
         mediaChunksRef.current = []
         const audioType = recorder.mimeType || mimeType || 'audio/mp4'
         const audio = new Blob(chunks, { type: audioType })
+        void trackChatEvent('voice_record_stop', {
+          sessionId: sessionIdRef.current,
+          metadata: { chunkCount: chunks.length, size: audio.size, type: audio.type || audioType }
+        })
         if (audio.size <= 0) {
+          void trackChatEvent('voice_upload_skipped_empty', { sessionId: sessionIdRef.current })
           addMessage('system', t.transcriptionFailed, 'voice')
           return
         }
@@ -1153,8 +1173,23 @@ export default function SupportChatbot({ language, theme }: Props) {
         setIsTranscribingVoice(true)
         convertRecordedAudioToWav(audio)
           .catch(() => audio)
-          .then((preparedAudio) => transcribeVoice(preparedAudio, lead.language))
+          .then((preparedAudio) => {
+            void trackChatEvent('voice_upload_start', {
+              sessionId: sessionIdRef.current,
+              metadata: {
+                originalType: audio.type,
+                originalSize: audio.size,
+                uploadType: preparedAudio.type,
+                uploadSize: preparedAudio.size
+              }
+            })
+            return transcribeVoice(preparedAudio, lead.language)
+          })
           .then((result) => {
+            void trackChatEvent(result.success ? 'voice_upload_success' : 'voice_upload_failed', {
+              sessionId: sessionIdRef.current,
+              metadata: { enabled: result.enabled, hasText: Boolean(result.text?.trim()), message: result.message }
+            })
             const transcript = result.text?.trim()
             if (result.success && transcript) {
               setInput(transcript)
@@ -1164,7 +1199,13 @@ export default function SupportChatbot({ language, theme }: Props) {
 
             addMessage('system', result.enabled ? result.message || t.transcriptionFailed : t.transcriptionUnavailable, 'voice')
           })
-          .catch(() => addMessage('system', t.transcriptionFailed, 'voice'))
+          .catch((error) => {
+            void trackChatEvent('voice_upload_exception', {
+              sessionId: sessionIdRef.current,
+              metadata: { message: error instanceof Error ? error.message : String(error) }
+            })
+            addMessage('system', t.transcriptionFailed, 'voice')
+          })
           .finally(() => setIsTranscribingVoice(false))
       }
 
@@ -1176,6 +1217,10 @@ export default function SupportChatbot({ language, theme }: Props) {
         }
       }, 10000)
     } catch {
+      void trackChatEvent('voice_permission_or_start_error', {
+        sessionId: sessionIdRef.current,
+        metadata: { userAgent: window.navigator.userAgent }
+      })
       clearVoiceRecordingTimer()
       stopMediaStream()
       mediaRecorderRef.current = null
