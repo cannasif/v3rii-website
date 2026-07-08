@@ -12,6 +12,7 @@ import {
   Minimize2,
   PackageCheck,
   Send,
+  Upload,
   Volume2,
   VolumeX,
   X
@@ -95,6 +96,7 @@ const text = {
       'iPhone’da tarayıcı konuşmanızı güvenli şekilde dinler, ardından V3RII API cevabı hazırlar.',
     iosVoiceAction: 'Konuşmaya başla',
     iosVoiceInputHint: 'Dinliyorum. Konuşmanız bitince kaydı durdurun; ben düşünüp cevabı hazırlayayım.',
+    iosVoiceFallbackAction: 'Ses dosyası kaydet/seç',
     stopRecording: 'Konuşmayı bitir',
     transcribing: 'Düşünüyorum...',
     transcriptionUnavailable:
@@ -178,6 +180,7 @@ const text = {
       'On iPhone, the browser securely listens to your turn, then the V3RII API prepares the answer.',
     iosVoiceAction: 'Start speaking',
     iosVoiceInputHint: 'Listening. Stop when you finish; I will think and prepare the answer.',
+    iosVoiceFallbackAction: 'Record/select audio',
     stopRecording: 'Finish speaking',
     transcribing: 'Thinking...',
     transcriptionUnavailable:
@@ -401,6 +404,7 @@ export default function SupportChatbot({ language, theme }: Props) {
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const nativeVoiceInputRef = useRef<HTMLInputElement>(null)
   const sessionIdRef = useRef(createId())
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
   const isListeningRef = useRef(false)
@@ -1086,6 +1090,53 @@ export default function SupportChatbot({ language, theme }: Props) {
     setIsRecordingVoice(false)
   }, [clearVoiceRecordingTimer, stopMediaStream])
 
+  const processVoiceAudio = useCallback((audio: Blob, source: 'media-recorder' | 'native-capture') => {
+    if (audio.size <= 0) {
+      void trackChatEvent('voice_upload_skipped_empty', { sessionId: sessionIdRef.current, metadata: { source } })
+      addMessage('system', t.transcriptionFailed, 'voice')
+      return
+    }
+
+    setIsTranscribingVoice(true)
+    convertRecordedAudioToWav(audio)
+      .catch(() => audio)
+      .then((preparedAudio) => {
+        void trackChatEvent('voice_upload_start', {
+          sessionId: sessionIdRef.current,
+          metadata: {
+            source,
+            originalType: audio.type,
+            originalSize: audio.size,
+            uploadType: preparedAudio.type,
+            uploadSize: preparedAudio.size
+          }
+        })
+        return transcribeVoice(preparedAudio, lead.language)
+      })
+      .then((result) => {
+        void trackChatEvent(result.success ? 'voice_upload_success' : 'voice_upload_failed', {
+          sessionId: sessionIdRef.current,
+          metadata: { source, enabled: result.enabled, hasText: Boolean(result.text?.trim()), message: result.message }
+        })
+        const transcript = result.text?.trim()
+        if (result.success && transcript) {
+          setInput(transcript)
+          submitMessageRef.current(transcript)
+          return
+        }
+
+        addMessage('system', result.enabled ? result.message || t.transcriptionFailed : t.transcriptionUnavailable, 'voice')
+      })
+      .catch((error) => {
+        void trackChatEvent('voice_upload_exception', {
+          sessionId: sessionIdRef.current,
+          metadata: { source, message: error instanceof Error ? error.message : String(error) }
+        })
+        addMessage('system', t.transcriptionFailed, 'voice')
+      })
+      .finally(() => setIsTranscribingVoice(false))
+  }, [lead.language, t.transcriptionFailed, t.transcriptionUnavailable])
+
   const startRecordedVoiceInput = useCallback(async () => {
     if (isRecordingVoice) {
       stopRecordedVoiceInput()
@@ -1097,7 +1148,7 @@ export default function SupportChatbot({ language, theme }: Props) {
         sessionId: sessionIdRef.current,
         metadata: { userAgent: window.navigator.userAgent }
       })
-      addMessage('system', t.speechNotSupported, 'voice')
+      nativeVoiceInputRef.current?.click()
       return
     }
 
@@ -1164,49 +1215,7 @@ export default function SupportChatbot({ language, theme }: Props) {
           sessionId: sessionIdRef.current,
           metadata: { chunkCount: chunks.length, size: audio.size, type: audio.type || audioType }
         })
-        if (audio.size <= 0) {
-          void trackChatEvent('voice_upload_skipped_empty', { sessionId: sessionIdRef.current })
-          addMessage('system', t.transcriptionFailed, 'voice')
-          return
-        }
-
-        setIsTranscribingVoice(true)
-        convertRecordedAudioToWav(audio)
-          .catch(() => audio)
-          .then((preparedAudio) => {
-            void trackChatEvent('voice_upload_start', {
-              sessionId: sessionIdRef.current,
-              metadata: {
-                originalType: audio.type,
-                originalSize: audio.size,
-                uploadType: preparedAudio.type,
-                uploadSize: preparedAudio.size
-              }
-            })
-            return transcribeVoice(preparedAudio, lead.language)
-          })
-          .then((result) => {
-            void trackChatEvent(result.success ? 'voice_upload_success' : 'voice_upload_failed', {
-              sessionId: sessionIdRef.current,
-              metadata: { enabled: result.enabled, hasText: Boolean(result.text?.trim()), message: result.message }
-            })
-            const transcript = result.text?.trim()
-            if (result.success && transcript) {
-              setInput(transcript)
-              submitMessageRef.current(transcript)
-              return
-            }
-
-            addMessage('system', result.enabled ? result.message || t.transcriptionFailed : t.transcriptionUnavailable, 'voice')
-          })
-          .catch((error) => {
-            void trackChatEvent('voice_upload_exception', {
-              sessionId: sessionIdRef.current,
-              metadata: { message: error instanceof Error ? error.message : String(error) }
-            })
-            addMessage('system', t.transcriptionFailed, 'voice')
-          })
-          .finally(() => setIsTranscribingVoice(false))
+        processVoiceAudio(audio, 'media-recorder')
       }
 
       recorder.start()
@@ -1225,19 +1234,17 @@ export default function SupportChatbot({ language, theme }: Props) {
       stopMediaStream()
       mediaRecorderRef.current = null
       setIsRecordingVoice(false)
-      addMessage('system', t.transcriptionFailed, 'voice')
+      nativeVoiceInputRef.current?.click()
     }
   }, [
     clearVoiceRecordingTimer,
     isRecordingVoice,
-    lead.language,
+    processVoiceAudio,
     selectRecordingMimeType,
     stopMediaStream,
     stopRecordedVoiceInput,
     stopSpeaking,
-    t.speechNotSupported,
     t.transcriptionFailed,
-    t.transcriptionUnavailable,
     unlockAudioPlayback
   ])
 
@@ -1504,6 +1511,21 @@ export default function SupportChatbot({ language, theme }: Props) {
       return
     }
     submitMessage(action.value)
+  }
+
+  const handleNativeVoiceFile = (file: File | undefined) => {
+    if (!file) return
+
+    setConversationModeEnabled(true)
+    setVoiceOutputEnabled(true)
+    setAwaitingVoiceContinue(false)
+    setAwaitingTapToSpeak(false)
+    setVoicePlaybackBlocked(false)
+    void trackChatEvent('voice_file_selected', {
+      sessionId: sessionIdRef.current,
+      metadata: { name: file.name, type: file.type, size: file.size, userAgent: window.navigator.userAgent }
+    })
+    processVoiceAudio(file, 'native-capture')
   }
 
   const PANEL_CLIP = 'polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px)'
@@ -1799,6 +1821,29 @@ export default function SupportChatbot({ language, theme }: Props) {
                         </div>
                       </div>
 
+                      {requiresManualVoiceTurn && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void trackChatEvent('voice_native_capture_open', {
+                              sessionId: sessionIdRef.current,
+                              metadata: { userAgent: window.navigator.userAgent }
+                            })
+                            nativeVoiceInputRef.current?.click()
+                          }}
+                          disabled={isSending || isRecordingVoice || isTranscribingVoice}
+                          className={`mt-2 flex min-h-9 w-full items-center justify-center gap-2 border px-3 py-2 font-cyber text-[10px] font-bold uppercase tracking-wider transition disabled:cursor-not-allowed disabled:opacity-55 ${
+                            isLight
+                              ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                              : 'border-emerald-400/35 bg-emerald-400/[0.08] text-emerald-300 hover:bg-emerald-400/[0.14]'
+                          }`}
+                          style={{ clipPath: CHIP_CLIP }}
+                        >
+                          <Upload className="h-3.5 w-3.5" />
+                          {t.iosVoiceFallbackAction}
+                        </button>
+                      )}
+
                       <div className={`mt-2 flex items-center gap-2 font-cyber text-[10px] uppercase tracking-[0.18em] ${isListening ? 'text-emerald-400' : isSpeaking ? 'text-cyan-400' : 'text-pink-400'}`}>
                         <span className="h-1.5 w-1.5 animate-pulse bg-current" />
                         {voiceStatusText}
@@ -1959,6 +2004,17 @@ export default function SupportChatbot({ language, theme }: Props) {
                 }}
                 className="flex items-end gap-2"
               >
+                <input
+                  ref={nativeVoiceInputRef}
+                  type="file"
+                  accept="audio/*"
+                  capture
+                  className="hidden"
+                  onChange={(event) => {
+                    handleNativeVoiceFile(event.target.files?.[0])
+                    event.target.value = ''
+                  }}
+                />
                 <div className="relative flex-1">
                   {requiresManualVoiceTurn && conversationModeEnabled && (
                     <div
