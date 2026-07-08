@@ -13,6 +13,8 @@ import {
   PackageCheck,
   Send,
   Upload,
+  ThumbsDown,
+  ThumbsUp,
   Volume2,
   VolumeX,
   X
@@ -23,6 +25,7 @@ import { askKnowledgeBase, sendSupportRequest, trackChatEvent, transcribeVoice }
 import type {
   ChatMessage,
   ChatMessageCard,
+  KnowledgeArticle,
   SupportIntent,
   SupportLanguage,
   SupportLead,
@@ -156,7 +159,15 @@ const text = {
     },
     quickCompany: 'V3RII kimdir?',
     quickRecommend: 'Hangi ürün bana uygun?',
-    recommendationTitle: 'İhtiyacınıza göre önerim'
+    recommendationTitle: 'İhtiyacınıza göre önerim',
+    contextReady: 'Bu ürün bağlamında yardımcı olabilirim',
+    compareTitle: 'Ürün karşılaştırması',
+    advisorNeeds: {
+      dealer: 'Bayi ağım var',
+      warehouse: 'Depo ve barkod yönetiyorum',
+      sales: 'Satış/teklif sürecim var',
+      compliance: 'UTS/ÜTS sürecim var'
+    }
   },
   en: {
     title: 'V3RII Support Assistant',
@@ -240,7 +251,15 @@ const text = {
     },
     quickCompany: 'Who is V3RII?',
     quickRecommend: 'Which product fits me?',
-    recommendationTitle: 'My recommendation for your need'
+    recommendationTitle: 'My recommendation for your need',
+    contextReady: 'I can help in this product context',
+    compareTitle: 'Product comparison',
+    advisorNeeds: {
+      dealer: 'I have a dealer network',
+      warehouse: 'I manage warehouse and barcode',
+      sales: 'I manage sales/quote flows',
+      compliance: 'I need UTS compliance'
+    }
   }
 }
 
@@ -269,6 +288,12 @@ const createInitialMessages = (language: SupportLanguage): ChatMessage[] => [
   { id: createId(), sender: 'bot', text: text[language].greeting },
   { id: createId(), sender: 'bot', text: text[language].askProduct, meta: 'product' }
 ]
+
+const normalizeProductKey = (value: unknown): SupportProductKey | null => {
+  if (typeof value !== 'string') return null
+  const normalized = value.toLowerCase()
+  return productKeys.find((key) => normalized === key || normalized.includes(key)) ?? null
+}
 
 const savePendingRequest = (lead: SupportLead, messages: ChatMessage[]) => {
   const current = JSON.parse(localStorage.getItem('v3riiPendingSupportRequests') || '[]')
@@ -393,6 +418,7 @@ export default function SupportChatbot({ language, theme }: Props) {
   const [voiceOutputEnabled, setVoiceOutputEnabled] = useState(false)
   const [conversationModeEnabled, setConversationModeEnabled] = useState(false)
   const [voicePersona, setVoicePersona] = useState<VoicePersona>('female')
+  const [messageFeedback, setMessageFeedback] = useState<Record<string, 'positive' | 'negative'>>({})
   const [audioUnlocked, setAudioUnlocked] = useState(false)
   const [voicePlaybackBlocked, setVoicePlaybackBlocked] = useState(false)
   const [awaitingVoiceContinue, setAwaitingVoiceContinue] = useState(false)
@@ -426,6 +452,8 @@ export default function SupportChatbot({ language, theme }: Props) {
   const latestTranscriptRef = useRef('')
   const lastSpokenMessageIdRef = useRef<string | null>(null)
   const lastSpokenTextRef = useRef('')
+  const lastProductContextRef = useRef<SupportProductKey | null>(null)
+  const announcedProductContextRef = useRef<SupportProductKey | null>(null)
   const outputAudioRef = useRef<HTMLAudioElement | null>(null)
   const t = text[lead.language]
   const isLight = theme === 'light'
@@ -749,7 +777,20 @@ export default function SupportChatbot({ language, theme }: Props) {
   // Ürün modalı açıkken chatbot tamamen gizlenir
   useEffect(() => {
     const onModalToggle = (event: Event) => {
-      setProductModalOpen(Boolean((event as CustomEvent<{ open: boolean }>).detail?.open))
+      const detail = (event as CustomEvent<{ open: boolean; productKey?: string; title?: string }>).detail
+      setProductModalOpen(Boolean(detail?.open))
+
+      const contextProduct = normalizeProductKey(detail?.productKey || detail?.title)
+      if (!contextProduct || contextProduct === lastProductContextRef.current) return
+
+      lastProductContextRef.current = contextProduct
+      setLead((prev) => ({ ...prev, product: contextProduct }))
+      setStep((prev) => (prev === 'product' ? 'intent' : prev))
+      void trackChatEvent('product_context_detected', {
+        product: contextProduct,
+        sessionId: sessionIdRef.current,
+        metadata: { source: 'product-modal', title: detail?.title }
+      })
     }
     window.addEventListener('v3rii-product-modal-toggle', onModalToggle)
     return () => window.removeEventListener('v3rii-product-modal-toggle', onModalToggle)
@@ -762,6 +803,91 @@ export default function SupportChatbot({ language, theme }: Props) {
   const addMessage = (sender: ChatMessage['sender'], value: string, meta?: string, cards?: ChatMessageCard[]) => {
     setMessages((prev) => [...prev, { id: createId(), sender, text: value, meta, cards }])
   }
+
+  useEffect(() => {
+    const onChatCommand = (event: Event) => {
+      const detail = (event as CustomEvent<{ open?: boolean; product?: string; intent?: SupportIntent; message?: string }>).detail
+      if (!detail) return
+
+      if (detail.open) {
+        setIsOpen(true)
+      }
+
+      const commandProduct = normalizeProductKey(detail.product)
+      if (commandProduct) {
+        setLead((prev) => ({ ...prev, product: commandProduct, intent: detail.intent ?? prev.intent }))
+        setStep(detail.intent === 'demo' ? 'collect-name' : 'intent')
+        addMessage('system', lead.language === 'tr' ? 'Web sitesi analizinden ürün bağlamı alındı.' : 'Product context received from website analysis.', productKnowledge[lead.language][commandProduct].title)
+      }
+
+      if (detail.message) {
+        addMessage('user', detail.message)
+        addMessage('bot', detail.intent === 'demo' ? t.askName : t.askIntent, detail.intent ?? 'intent')
+        void trackChatEvent('calculator_demo_requested', {
+          product: commandProduct ?? lead.product,
+          intent: detail.intent ?? 'demo',
+          sessionId: sessionIdRef.current,
+          metadata: {
+            source: 'operation-value-calculator',
+            message: detail.message
+          }
+        })
+      }
+    }
+
+    window.addEventListener('v3rii-chat-command', onChatCommand)
+    return () => window.removeEventListener('v3rii-chat-command', onChatCommand)
+  }, [addMessage, lead.language, lead.product, t.askIntent, t.askName])
+
+  const submitAnswerFeedback = (message: ChatMessage, rating: 'positive' | 'negative') => {
+    setMessageFeedback((prev) => ({ ...prev, [message.id]: rating }))
+    const messageIndex = messages.findIndex((item) => item.id === message.id)
+    const previousQuestion = [...messages.slice(0, messageIndex)]
+      .reverse()
+      .find((item) => item.sender === 'user')?.text ?? '-'
+
+    void trackChatEvent('answer_feedback', {
+      product: lead.product,
+      intent: lead.intent || 'product-info',
+      sessionId: sessionIdRef.current,
+      metadata: {
+        rating,
+        question: previousQuestion,
+        answer: message.text,
+        language: lead.language,
+        meta: message.meta,
+        sourceCount: message.cards?.length ?? 0
+      }
+    })
+
+    if (rating === 'negative') {
+      void trackChatEvent('unanswered_question', {
+        product: lead.product,
+        intent: lead.intent || 'product-info',
+        sessionId: sessionIdRef.current,
+        metadata: {
+          question: previousQuestion,
+          language: lead.language,
+          reason: 'negative_answer_feedback'
+        }
+      })
+    }
+  }
+
+  useEffect(() => {
+    const contextProduct = lastProductContextRef.current
+    if (!isOpen || !contextProduct || announcedProductContextRef.current === contextProduct) return
+
+    announcedProductContextRef.current = contextProduct
+    const product = productKnowledge[lead.language][contextProduct]
+    addMessage(
+      'bot',
+      `${t.contextReady}: ${product.title}. ${product.summary}`,
+      'context',
+      createProductCards(contextProduct, lead.language).slice(0, 4)
+    )
+    addMessage('bot', t.askIntent, 'intent')
+  }, [isOpen, lead.language, t.askIntent, t.contextReady])
 
   const reset = (nextLanguage = lead.language) => {
     stopListening(true)
@@ -844,6 +970,72 @@ export default function SupportChatbot({ language, theme }: Props) {
     }
   }
 
+  const createComparisonAnswer = (first: SupportProductKey, second: SupportProductKey, activeLanguage = lead.language) => {
+    const firstProduct = productKnowledge[activeLanguage][first]
+    const secondProduct = productKnowledge[activeLanguage][second]
+    const labels = activeLanguage === 'tr'
+      ? {
+          focus: 'Odak',
+          bestFor: 'En uygun kullanım',
+          modules: 'Modül ağırlığı',
+          integration: 'Entegrasyon',
+          result: 'Kısa karar'
+        }
+      : {
+          focus: 'Focus',
+          bestFor: 'Best fit',
+          modules: 'Module emphasis',
+          integration: 'Integration',
+          result: 'Short decision'
+        }
+
+    const decision =
+      activeLanguage === 'tr'
+        ? `${firstProduct.shortTitle} daha çok ${firstProduct.idealFor.toLocaleLowerCase('tr-TR')} için; ${secondProduct.shortTitle} ise ${secondProduct.idealFor.toLocaleLowerCase('tr-TR')} için konumlanır.`
+        : `${firstProduct.shortTitle} is positioned for ${firstProduct.idealFor.toLowerCase()}; ${secondProduct.shortTitle} is positioned for ${secondProduct.idealFor.toLowerCase()}.`
+
+    return {
+      text: `${text[activeLanguage].compareTitle}: ${firstProduct.shortTitle} vs ${secondProduct.shortTitle}\n\n${decision}`,
+      cards: [
+        {
+          title: firstProduct.title,
+          body: `${labels.focus}: ${firstProduct.summary}\n\n${labels.bestFor}: ${firstProduct.idealFor}\n\n${labels.modules}:\n${firstProduct.modules.slice(0, 4).join('\n')}\n\n${labels.integration}:\n${firstProduct.integrations.join('\n')}`
+        },
+        {
+          title: secondProduct.title,
+          body: `${labels.focus}: ${secondProduct.summary}\n\n${labels.bestFor}: ${secondProduct.idealFor}\n\n${labels.modules}:\n${secondProduct.modules.slice(0, 4).join('\n')}\n\n${labels.integration}:\n${secondProduct.integrations.join('\n')}`
+        },
+        {
+          title: labels.result,
+          body:
+            activeLanguage === 'tr'
+              ? `Satış, teklif, müşteri ve raporlama diyorsanız CRM; bayi portalı, katalog, müşteri fiyat/stok görünürlüğü diyorsanız B2B; depo/barkod/kalite diyorsanız WMS; UTS/ÜTS mevzuat listeleri diyorsanız UTS daha doğru başlangıçtır.`
+              : `Choose CRM for sales, quotes, customers and reporting; B2B for dealer portal, catalog and customer price/stock visibility; WMS for warehouse, barcode and quality; UTS for product-tracking compliance lists.`
+        }
+      ]
+    }
+  }
+
+  const detectComparisonProducts = (value: string): [SupportProductKey, SupportProductKey] | null => {
+    const normalized = value.toLocaleLowerCase('tr-TR')
+    const mentioned = productKeys.filter((key) => {
+      if (normalized.includes(key)) return true
+      const product = productKnowledge.tr[key]
+      return normalized.includes(product.shortTitle.toLocaleLowerCase('tr-TR'))
+    })
+
+    const unique = Array.from(new Set(mentioned))
+    if (unique.length >= 2 && /vs|karşılaştır|karsilastir|fark|farkı|farki|compare|difference/i.test(value)) {
+      return [unique[0], unique[1]]
+    }
+
+    if (/crm.*b2b|b2b.*crm/i.test(value)) return ['crm', 'b2b']
+    if (/wms.*uts|uts.*wms|wms.*üts|üts.*wms/i.test(value)) return ['wms', 'uts']
+    if (/crm.*wms|wms.*crm/i.test(value)) return ['crm', 'wms']
+    if (/b2b.*wms|wms.*b2b/i.test(value)) return ['b2b', 'wms']
+    return null
+  }
+
   const createProductCards = (productKey: SupportProductKey, activeLanguage = lead.language): ChatMessageCard[] => {
     const product = productKnowledge[activeLanguage][productKey]
     return [
@@ -857,15 +1049,68 @@ export default function SupportChatbot({ language, theme }: Props) {
     ]
   }
 
+  const formatKnowledgeProduct = (product: string) => {
+    const normalized = normalizeProductKey(product)
+    return normalized ? productKnowledge[lead.language][normalized].shortTitle : product
+  }
+
+  const createKnowledgeSourceCards = (sources: KnowledgeArticle[], activeLanguage = lead.language): ChatMessageCard[] =>
+    sources.slice(0, 5).map((source, index) => {
+      const labels = activeLanguage === 'tr'
+        ? { source: 'Kaynak', product: 'Ürün', summary: 'Özet', content: 'İçerik', tags: 'Etiketler' }
+        : { source: 'Source', product: 'Product', summary: 'Summary', content: 'Content', tags: 'Tags' }
+
+      return {
+        title: `${labels.source} ${index + 1} // ${source.title}`,
+        body: [
+          `${labels.product}: ${formatKnowledgeProduct(source.product)}`,
+          source.summary ? `${labels.summary}: ${source.summary}` : '',
+          source.contentMarkdown ? `${labels.content}:\n${source.contentMarkdown}` : '',
+          source.tags ? `${labels.tags}: ${source.tags}` : ''
+        ].filter(Boolean).join('\n\n')
+      }
+    })
+
   const answerFromKnowledgeBase = async (question: string, product = lead.product, activeLanguage = lead.language) => {
     try {
       const result = await askKnowledgeBase(product, question, activeLanguage, sessionIdRef.current)
-      const cards = result.sources.map((source) => ({
-        title: source.title,
-        body: `${source.summary}\n\n${source.contentMarkdown}`
-      }))
+      const cards = createKnowledgeSourceCards(result.sources, activeLanguage)
+      if (!result.hasDirectMatch) {
+        void trackChatEvent('unanswered_question', {
+          product,
+          intent: 'product-info',
+          sessionId: sessionIdRef.current,
+          metadata: {
+            question,
+            language: activeLanguage,
+            reason: result.sources.length > 0 ? 'fallback_sources_only' : 'no_source'
+          }
+        })
+      } else {
+        void trackChatEvent('knowledge_answered', {
+          product,
+          intent: 'product-info',
+          sessionId: sessionIdRef.current,
+          metadata: {
+            question,
+            language: activeLanguage,
+            sourceCount: result.sources.length,
+            usedLlm: result.usedLlm
+          }
+        })
+      }
       addMessage('bot', result.answer, result.usedLlm ? 'LLM + RAG' : 'Bilgi tabanı', cards)
     } catch {
+      void trackChatEvent('unanswered_question', {
+        product,
+        intent: 'product-info',
+        sessionId: sessionIdRef.current,
+        metadata: {
+          question,
+          language: activeLanguage,
+          reason: 'knowledge_api_failed'
+        }
+      })
       if (product) {
         addMessage('bot', describeProduct(product, activeLanguage), 'offline', createProductCards(product, activeLanguage))
       } else {
@@ -921,7 +1166,26 @@ export default function SupportChatbot({ language, theme }: Props) {
       company: currentLead.company === '-' ? undefined : currentLead.company,
       details,
       language: currentLead.language,
-      transcript: messages
+      transcript: messages,
+      leadSignals: {
+        sessionId: sessionIdRef.current,
+        language: currentLead.language,
+        messageCount: messages.length,
+        hasCompany: Boolean(currentLead.company && currentLead.company !== '-'),
+        requestedProduct: currentLead.product,
+        requestedIntent: currentLead.intent,
+        productContext: lastProductContextRef.current,
+        detailsLength: details.length,
+        mentioned: {
+          netsisOrErp: /netsis|erp|logo|sap|entegrasyon|integration/i.test(details),
+          pricing: /fiyat|teklif|pricing|quote|bütçe|budget/i.test(details),
+          demo: /demo|görüşme|meeting|sunum|presentation/i.test(details),
+          warehouse: /depo|barkod|sevkiyat|warehouse|barcode/i.test(details),
+          dealer: /bayi|portal|katalog|dealer|b2b/i.test(details),
+          compliance: /uts|üts|ut s|mevzuat|compliance/i.test(details),
+          urgent: /acil|urgent|kritik|çalışmıyor|error|hata/i.test(details)
+        }
+      }
     }
 
     setIsSending(true)
@@ -961,6 +1225,7 @@ export default function SupportChatbot({ language, theme }: Props) {
       /netsis|erp|entegrasyon|integration|api|outlook|whatsapp|power bi|elogo|e-logo|pazar yeri|marketplace/i.test(value)
     const wantsPortfolio =
       /tüm|hepsi|ürünler|projeler|portfolio|all products|all projects/i.test(value) && !productFromText
+    const comparisonProducts = detectComparisonProducts(value)
 
     if (asksCompany) {
       addMessage('bot', describeCompany(detectedLanguage), 'company', createCompanyCards(detectedLanguage))
@@ -968,8 +1233,27 @@ export default function SupportChatbot({ language, theme }: Props) {
       return
     }
 
+    if (comparisonProducts) {
+      const comparison = createComparisonAnswer(comparisonProducts[0], comparisonProducts[1], detectedLanguage)
+      void trackChatEvent('product_compared', {
+        product: comparisonProducts[0],
+        intent: 'product-info',
+        sessionId: sessionIdRef.current,
+        metadata: { comparedWith: comparisonProducts[1], question: value }
+      })
+      addMessage('bot', comparison.text, 'comparison', comparison.cards)
+      addMessage('bot', activeText.askNeed, 'advisor')
+      return
+    }
+
     if (asksRecommendation) {
       const recommendation = createRecommendationAnswer(value, detectedLanguage)
+      void trackChatEvent('product_recommendation_requested', {
+        product: productFromText ?? undefined,
+        intent: 'product-info',
+        sessionId: sessionIdRef.current,
+        metadata: { question: value }
+      })
       addMessage('bot', recommendation.text, 'advisor', recommendation.cards)
       return
     }
@@ -1480,6 +1764,24 @@ export default function SupportChatbot({ language, theme }: Props) {
       return [
         { label: t.quickCompany, value: t.quickCompany },
         { label: t.quickRecommend, value: t.quickRecommend },
+        {
+          label: t.advisorNeeds.dealer,
+          value: lead.language === 'tr' ? 'Bayi ağım var, müşteri portalı ve katalog için hangi ürün uygun?' : 'I have a dealer network, customer portal and catalog need. Which product fits?'
+        },
+        {
+          label: t.advisorNeeds.warehouse,
+          value: lead.language === 'tr' ? 'Depo, barkod, sevkiyat ve stok sayımı için hangi ürün uygun?' : 'Which product fits warehouse, barcode, shipment and stock count?'
+        },
+        {
+          label: t.advisorNeeds.sales,
+          value: lead.language === 'tr' ? 'Satış, teklif, müşteri ve raporlama için hangi ürün uygun?' : 'Which product fits sales, quotes, customers and reporting?'
+        },
+        {
+          label: t.advisorNeeds.compliance,
+          value: lead.language === 'tr' ? 'UTS ve ÜTS süreçleri için hangi ürün uygun?' : 'Which product fits UTS compliance workflows?'
+        },
+        { label: 'CRM vs B2B', value: lead.language === 'tr' ? 'CRM ile B2B farkı nedir?' : 'Compare CRM and B2B' },
+        { label: 'WMS vs UTS', value: lead.language === 'tr' ? 'WMS ile UTS farkı nedir?' : 'Compare WMS and UTS' },
         { label: t.portfolio, value: t.portfolio },
         ...productKeys.map((key) => ({
           label: productKnowledge[lead.language][key].shortTitle,
@@ -1503,7 +1805,7 @@ export default function SupportChatbot({ language, theme }: Props) {
     }
 
     return []
-  }, [lead.language, step, t.actions, t.portfolio, t.quickCompany, t.quickRecommend])
+  }, [lead.language, step, t.actions, t.advisorNeeds, t.portfolio, t.quickCompany, t.quickRecommend])
 
   const handleQuickAction = (action: QuickAction) => {
     if (step === 'submitted') {
@@ -1969,6 +2271,49 @@ export default function SupportChatbot({ language, theme }: Props) {
                             </p>
                           </details>
                         ))}
+                      </div>
+                    )}
+                    {message.sender === 'bot' && message.meta !== 'product' && (
+                      <div className="mt-3 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => submitAnswerFeedback(message, 'positive')}
+                          disabled={Boolean(messageFeedback[message.id])}
+                          className={`grid h-7 w-7 place-items-center border transition ${
+                            messageFeedback[message.id] === 'positive'
+                              ? 'border-emerald-400 bg-emerald-400/15 text-emerald-300'
+                              : isLight
+                                ? 'border-cyan-200 bg-white/70 text-cyan-700 hover:border-emerald-400 hover:text-emerald-600'
+                                : 'border-cyan-400/20 bg-cyan-400/5 text-cyan-300 hover:border-emerald-400 hover:text-emerald-300'
+                          } disabled:cursor-default`}
+                          title={lead.language === 'tr' ? 'Yanıt faydalıydı' : 'Helpful answer'}
+                          aria-label={lead.language === 'tr' ? 'Yanıt faydalıydı' : 'Helpful answer'}
+                          style={{ clipPath: CHIP_CLIP }}
+                        >
+                          <ThumbsUp className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => submitAnswerFeedback(message, 'negative')}
+                          disabled={Boolean(messageFeedback[message.id])}
+                          className={`grid h-7 w-7 place-items-center border transition ${
+                            messageFeedback[message.id] === 'negative'
+                              ? 'border-pink-400 bg-pink-500/15 text-pink-300'
+                              : isLight
+                                ? 'border-cyan-200 bg-white/70 text-cyan-700 hover:border-pink-400 hover:text-pink-600'
+                                : 'border-cyan-400/20 bg-cyan-400/5 text-cyan-300 hover:border-pink-400 hover:text-pink-300'
+                          } disabled:cursor-default`}
+                          title={lead.language === 'tr' ? 'Yanıt yetersizdi' : 'Not helpful'}
+                          aria-label={lead.language === 'tr' ? 'Yanıt yetersizdi' : 'Not helpful'}
+                          style={{ clipPath: CHIP_CLIP }}
+                        >
+                          <ThumbsDown className="h-3.5 w-3.5" />
+                        </button>
+                        {messageFeedback[message.id] && (
+                          <span className={`font-cyber text-[9px] uppercase tracking-wider ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                            {lead.language === 'tr' ? 'Geri bildirim alındı' : 'Feedback saved'}
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>

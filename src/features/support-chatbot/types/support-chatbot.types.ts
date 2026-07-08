@@ -57,6 +57,7 @@ export type SupportRequestPayload = Required<Pick<SupportLead, 'name' | 'email' 
   intent: SupportIntent
   company?: string
   transcript: ChatMessage[]
+  leadSignals?: Record<string, unknown>
 }
 
 export type SupportRequestResult = {

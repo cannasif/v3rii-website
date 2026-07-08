@@ -7,6 +7,16 @@ import type { Language, Theme } from "../../App";
 
 type Product = (typeof products)[number];
 
+const getProductKey = (product: Product) => {
+  const title = product.title.en.toLowerCase();
+  if (title.includes("crm")) return "crm";
+  if (title.includes("aqua")) return "aqua";
+  if (title.includes("b2b")) return "b2b";
+  if (title.includes("wms")) return "wms";
+  if (title.includes("uts")) return "uts";
+  return undefined;
+};
+
 type Props = {
   language: Language;
   theme: Theme;
@@ -504,6 +514,7 @@ export default function Products({ language, theme }: Props) {
           selectedProduct
             ? {
                 ...selectedProduct,
+                productKey: getProductKey(selectedProduct),
                 title: selectedProduct.title[lang],
                 eyebrow: selectedProduct.eyebrow[lang],
                 description: selectedProduct.description[lang],

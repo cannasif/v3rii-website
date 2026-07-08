@@ -20,7 +20,8 @@ export async function sendSupportRequest(payload: SupportRequestPayload): Promis
     transcriptJson: JSON.stringify(payload.transcript),
     requiresHandoff: /canlı|temsilci|operator|acil|urgent|human|representative/i.test(payload.details),
     handoffReason: /canlı|temsilci|operator|human|representative/i.test(payload.details) ? 'Müşteri canlı destek talep etti.' : undefined,
-    source: 'website-chatbot'
+    source: 'website-chatbot',
+    leadSignalsJson: payload.leadSignals ? JSON.stringify(payload.leadSignals) : undefined
   })
 
   return { success: true, message: 'Talebiniz destek ekibine iletildi.', ticketNo: result.ticketNo }
@@ -51,7 +52,14 @@ export async function sendWebsiteContactRequest(payload: {
     ]),
     requiresHandoff: true,
     handoffReason: 'Tanıtım sitesi iletişim formu üzerinden demo/proje talebi geldi.',
-    source: 'website-contact-form'
+    source: 'website-contact-form',
+    leadSignalsJson: JSON.stringify({
+      channel: 'website-contact-form',
+      language: payload.language,
+      hasCompany: Boolean(payload.company && payload.company !== '-'),
+      messageLength: payload.message.length,
+      highIntent: /demo|fiyat|teklif|pricing|quote|netsis|erp|entegrasyon/i.test(payload.message)
+    })
   })
 
   return { success: true, message: 'Talebiniz destek ekibine iletildi.', ticketNo: result.ticketNo }
@@ -68,7 +76,7 @@ export async function trackChatEvent(eventType: string, payload: { product?: Sup
 }
 
 export async function askKnowledgeBase(product: SupportProductKey | undefined, question: string, language: string, sessionId: string) {
-  return api.post<{ answer: string; sources: KnowledgeArticle[]; usedLlm: boolean }>('/api/chat/answer', {
+  return api.post<{ answer: string; sources: KnowledgeArticle[]; usedLlm: boolean; hasDirectMatch: boolean }>('/api/chat/answer', {
       product: product ? productMap[product] : undefined,
       question,
       language,

@@ -1,5 +1,6 @@
 import Hero from '../components/sections/Hero'
 import Products from '../components/sections/Products'
+import OperationValue from '../components/sections/OperationValue'
 import About from '../components/sections/About'
 import Contact from '../components/sections/Contact'
 import FadeInSection from '../components/ui/FadeInSection'
@@ -20,6 +21,9 @@ export default function Home({ language, theme }: Props) {
       </FadeInSection>
       <FadeInSection delay={0.05} parallaxDepth={130}>
         <Products language={language} theme={theme} />
+      </FadeInSection>
+      <FadeInSection delay={0.08} parallaxDepth={120}>
+        <OperationValue language={language} theme={theme} />
       </FadeInSection>
       <FadeInSection delay={0.12} parallaxDepth={115}>
         <About language={language} theme={theme} />

@@ -5,6 +5,7 @@ import { X, ChevronRight, Terminal, Cpu, Network, SlidersHorizontal, Layers3 } f
 import type { Language, Theme } from "../../App";
 
 type Product = {
+  productKey?: string;
   title: string;
   eyebrow?: string;
   logo?: string;
@@ -71,7 +72,13 @@ export default function ProductModal({ product, onClose, language, theme }: Prod
 
   // Yüzen butonlar (Yukarı Çık, AI asistan) modal açıkken gizlensin
   useEffect(() => {
-    window.dispatchEvent(new CustomEvent("v3rii-product-modal-toggle", { detail: { open: Boolean(product) } }));
+    window.dispatchEvent(new CustomEvent("v3rii-product-modal-toggle", {
+      detail: {
+        open: Boolean(product),
+        productKey: product?.productKey,
+        title: product?.title
+      }
+    }));
     return () => {
       window.dispatchEvent(new CustomEvent("v3rii-product-modal-toggle", { detail: { open: false } }));
     };
