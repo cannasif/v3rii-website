@@ -2,21 +2,18 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   AlertCircle,
   Bot,
-  Building2,
   CheckCircle2,
   ChevronDown,
   Headphones,
-  Mail,
   Mic,
   MicOff,
+  Maximize2,
   Minimize2,
-  PackageCheck,
   Send,
   Upload,
   ThumbsDown,
   ThumbsUp,
   Volume2,
-  VolumeX,
   X
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -84,8 +81,9 @@ const text = {
     input: 'Sorunuzu veya talebinizi yazın...',
     send: 'Gönder',
     minimize: 'Küçült',
+    expand: 'Genişlet',
     close: 'Kapat',
-    reset: 'Yeni görüşme',
+    reset: '+ Yeni Sohbet',
     voiceInput: 'Sesli konuş',
     stopVoiceInput: 'Dinlemeyi durdur',
     voiceOutputOn: 'Sesli cevap açık',
@@ -176,8 +174,9 @@ const text = {
     input: 'Type your question or request...',
     send: 'Send',
     minimize: 'Minimize',
+    expand: 'Expand',
     close: 'Close',
-    reset: 'New chat',
+    reset: '+ New chat',
     voiceInput: 'Speak',
     stopVoiceInput: 'Stop listening',
     voiceOutputOn: 'Voice replies on',
@@ -406,6 +405,8 @@ const convertRecordedAudioToWav = async (audio: Blob) => {
 export default function SupportChatbot({ language, theme }: Props) {
   const initialLanguage: SupportLanguage = language === 'en' ? 'en' : 'tr'
   const [isOpen, setIsOpen] = useState(false)
+  const [isPanelExpanded, setIsPanelExpanded] = useState(false)
+  const [showLauncher, setShowLauncher] = useState(true)
   const [productModalOpen, setProductModalOpen] = useState(false)
   const [headerExpanded, setHeaderExpanded] = useState(false)
   const [step, setStep] = useState<SupportStep>('product')
@@ -845,6 +846,10 @@ export default function SupportChatbot({ language, theme }: Props) {
 
   useEffect(() => {
     isOpenRef.current = isOpen
+  }, [isOpen])
+
+  useEffect(() => {
+    if (isOpen) setShowLauncher(false)
   }, [isOpen])
 
   useEffect(() => {
@@ -1456,20 +1461,6 @@ export default function SupportChatbot({ language, theme }: Props) {
     submitMessageRef.current = submitMessage
   })
 
-  const toggleVoiceOutput = () => {
-    setVoiceOutputEnabled((prev) => {
-      const next = !prev
-      if (!next) {
-        setConversationModeEnabled(false)
-        stopSpeaking()
-      } else {
-        manualSpeechUnlockedRef.current = true
-        void unlockAudioPlayback()
-      }
-      return next
-    })
-  }
-
   const stopRecordedVoiceInput = useCallback(() => {
     clearVoiceRecordingTimer()
     const recorder = mediaRecorderRef.current
@@ -1877,24 +1868,6 @@ export default function SupportChatbot({ language, theme }: Props) {
     setVoicePlaybackBlocked(false)
   }
 
-  const toggleConversationMode = () => {
-    if (conversationModeEnabled) {
-      closeConversationMode()
-      return
-    }
-
-    setConversationModeEnabled(true)
-    lastSpokenMessageIdRef.current = messages[messages.length - 1]?.id ?? lastSpokenMessageIdRef.current
-    setVoiceOutputEnabled(true)
-    manualSpeechUnlockedRef.current = true
-    void unlockAudioPlayback()
-    if (requiresManualVoiceTurnRef.current) {
-      void startRecordedVoiceInput()
-      return
-    }
-    startListening()
-  }
-
   const quickActions = useMemo<QuickAction[]>(() => {
     if (step === 'product') {
       return [
@@ -1967,6 +1940,23 @@ export default function SupportChatbot({ language, theme }: Props) {
   }
 
   const PANEL_CLIP = 'polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px)'
+  const PANEL_SIZE_COMPACT =
+    'h-[min(680px,calc(100dvh-120px))] w-[min(430px,calc(100vw-1.5rem))] sm:w-[min(430px,calc(100vw-3.5rem))]'
+  const PANEL_SIZE_EXPANDED_DESKTOP =
+    'sm:h-[min(920px,calc(100dvh-3rem))] sm:w-[min(720px,calc(100vw-4rem))]'
+  const panelSizeClass = isPanelExpanded ? `${PANEL_SIZE_COMPACT} ${PANEL_SIZE_EXPANDED_DESKTOP}` : PANEL_SIZE_COMPACT
+  const panelTypography = {
+    title: isPanelExpanded ? 'text-sm sm:text-base' : 'text-sm',
+    subtitle: isPanelExpanded ? 'text-[11px] sm:text-[13px]' : 'text-[11px]',
+    message: isPanelExpanded ? 'text-sm sm:text-base' : 'text-sm',
+    body: isPanelExpanded ? 'text-xs sm:text-sm' : 'text-xs',
+    input: isPanelExpanded ? 'text-sm sm:text-base' : 'text-sm'
+  }
+
+  const closePanel = () => {
+    setIsOpen(false)
+    setIsPanelExpanded(false)
+  }
   const CHIP_CLIP = 'polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px)'
   const LAUNCHER_CLIP = 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)'
   const voiceSessionVisible =
@@ -1989,32 +1979,38 @@ export default function SupportChatbot({ language, theme }: Props) {
 
   if (productModalOpen) return null
 
+  const handlePanelExitComplete = () => {
+    if (!isOpenRef.current) setShowLauncher(true)
+  }
+
   return (
     <div
-      className="fixed left-3 right-3 z-[95] flex justify-end pointer-events-none sm:right-7 sm:left-auto"
+      className="fixed left-3 right-3 z-[95] pointer-events-none sm:right-7 sm:left-auto"
       style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
     >
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            key="chat-backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            onClick={() => setIsOpen(false)}
-            className={`pointer-events-auto fixed inset-0 backdrop-blur-[3px] sm:hidden ${isLight ? 'bg-white/30' : 'bg-black/50'}`}
-          />
-        )}
-        {isOpen && (
-          <motion.aside
-            key="chat-panel"
-            initial={{ opacity: 0, y: 24, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 18, scale: 0.98 }}
-            transition={{ duration: 0.22 }}
-            style={{ clipPath: PANEL_CLIP }}
-            className={`pointer-events-auto mb-3 flex h-[min(680px,calc(100dvh-120px))] w-full max-w-[430px] flex-col overflow-hidden border backdrop-blur-2xl ${
+      <div className="relative ml-auto h-14 w-14 sm:h-16 sm:w-16">
+        <AnimatePresence onExitComplete={handlePanelExitComplete}>
+          {isOpen && (
+            <motion.div
+              key="chat-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={closePanel}
+              className={`pointer-events-auto fixed inset-0 z-0 backdrop-blur-[2px] ${isLight ? 'bg-white/25 sm:bg-white/15' : 'bg-black/45 sm:bg-black/30'}`}
+              aria-hidden="true"
+            />
+          )}
+          {isOpen && (
+            <motion.aside
+              key="chat-panel"
+              initial={{ opacity: 0, y: 16, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+              transition={{ duration: 0.22 }}
+              style={{ clipPath: PANEL_CLIP, transformOrigin: 'bottom right' }}
+              className={`pointer-events-auto fixed bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] right-3 z-10 flex flex-col overflow-hidden border backdrop-blur-2xl transition-[height,width] duration-300 ease-out sm:absolute sm:inset-x-auto sm:bottom-0 sm:right-0 ${panelSizeClass} ${
               isLight
                 ? 'border-pink-400/50 bg-white/94 text-slate-950 shadow-[0_24px_70px_rgba(219,39,119,0.22)]'
                 : 'border-pink-500/35 bg-[#060910]/94 text-white shadow-[0_24px_80px_rgba(219,39,119,0.28)]'
@@ -2043,29 +2039,23 @@ export default function SupportChatbot({ language, theme }: Props) {
                   >
                     <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${headerExpanded ? 'rotate-180' : ''}`} />
                   </button>
-                  <button onClick={() => reset()} className={`p-1.5 text-cyan-400 transition hover:text-pink-400 ${isLight ? 'hover:bg-pink-100' : 'hover:bg-white/10'}`} title={t.reset}>
-                    <PackageCheck className="h-4 w-4" />
+                  <button
+                    onClick={() => reset()}
+                    className={`px-2 py-1 font-cyber text-[10px] font-semibold uppercase tracking-wider text-cyan-400 transition hover:text-pink-400 ${isLight ? 'hover:bg-pink-100' : 'hover:bg-white/10'}`}
+                    title={t.reset}
+                  >
+                    {t.reset}
                   </button>
                   <button
-                    onClick={toggleVoiceOutput}
-                    className={`p-1.5 transition hover:text-pink-400 ${voiceOutputEnabled ? 'text-emerald-400' : 'text-cyan-400'} ${isLight ? 'hover:bg-pink-100' : 'hover:bg-white/10'}`}
-                    title={voiceOutputEnabled ? t.voiceOutputOn : t.voiceOutputOff}
-                    aria-pressed={voiceOutputEnabled}
+                    onClick={() => setIsPanelExpanded((prev) => !prev)}
+                    className={`hidden items-center justify-center p-1.5 text-cyan-400 transition hover:text-pink-400 sm:inline-flex ${isLight ? 'hover:bg-pink-100' : 'hover:bg-white/10'}`}
+                    title={isPanelExpanded ? t.minimize : t.expand}
+                    aria-pressed={isPanelExpanded}
+                    aria-label={isPanelExpanded ? t.minimize : t.expand}
                   >
-                    {voiceOutputEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+                    {isPanelExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                   </button>
-                  <button
-                    onClick={toggleConversationMode}
-                    className={`p-1.5 transition hover:text-pink-400 ${conversationModeEnabled ? 'text-emerald-400' : 'text-cyan-400'} ${isLight ? 'hover:bg-pink-100' : 'hover:bg-white/10'}`}
-                    title={conversationModeEnabled ? t.conversationModeOn : t.conversationModeOff}
-                    aria-pressed={conversationModeEnabled}
-                  >
-                    <Headphones className="h-4 w-4" />
-                  </button>
-                  <button onClick={() => setIsOpen(false)} className={`p-1.5 text-cyan-400 transition hover:text-pink-400 ${isLight ? 'hover:bg-pink-100' : 'hover:bg-white/10'}`} title={t.minimize}>
-                    <Minimize2 className="h-4 w-4" />
-                  </button>
-                  <button onClick={() => setIsOpen(false)} className={`p-1.5 text-pink-500 transition hover:text-white ${isLight ? 'hover:bg-pink-500' : 'hover:bg-pink-500'}`} title={t.close}>
+                  <button onClick={closePanel} className={`p-1.5 text-pink-500 transition hover:text-white ${isLight ? 'hover:bg-pink-500' : 'hover:bg-pink-500'}`} title={t.close}>
                     <X className="h-4 w-4" />
                   </button>
                 </div>
@@ -2082,32 +2072,15 @@ export default function SupportChatbot({ language, theme }: Props) {
                   <Bot className="h-6 w-6" style={{ animation: 'cyberBotEyeBlink 4s infinite' }} />
                 </div>
                 <div className="min-w-0">
-                  <h2 className={`truncate font-cyber text-sm font-bold uppercase tracking-wider ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                  <h2 className={`truncate font-cyber ${panelTypography.title} font-bold uppercase tracking-wider ${isLight ? 'text-slate-900' : 'text-white'}`}>
                     {t.title}
                   </h2>
-                  <p className={`mt-0.5 text-[11px] leading-snug ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{t.subtitle}</p>
+                  <p className={`mt-0.5 ${panelTypography.subtitle} leading-snug ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{t.subtitle}</p>
                   <div className="mt-1.5 flex items-center gap-1.5 font-cyber text-[9px] uppercase tracking-[0.22em] text-emerald-400">
                     <span className="h-1.5 w-1.5 animate-pulse bg-emerald-400" />
                     ONLINE
                   </div>
                 </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2 px-4 pb-3 text-[10px]">
-                <span style={{ clipPath: CHIP_CLIP }} className={`inline-flex items-center gap-1 border px-2.5 py-1 font-cyber uppercase tracking-wider ${isLight ? 'border-cyan-300/60 bg-cyan-50 text-slate-600' : 'border-cyan-400/25 bg-cyan-400/5 text-cyan-200'}`}>
-                  <Building2 className="h-3 w-3" />
-                  CRM / B2B / WMS / UTS
-                </span>
-                <span style={{ clipPath: CHIP_CLIP }} className={`inline-flex items-center gap-1 border px-2.5 py-1 font-cyber uppercase tracking-wider ${isLight ? 'border-pink-300/60 bg-pink-50 text-pink-700' : 'border-pink-500/30 bg-pink-500/5 text-pink-300'}`}>
-                  <Mail className="h-3 w-3" />
-                  Support mail
-                </span>
-                {speechSupported && (
-                  <span style={{ clipPath: CHIP_CLIP }} className={`inline-flex items-center gap-1 border px-2.5 py-1 font-cyber uppercase tracking-wider ${isLight ? 'border-emerald-300/70 bg-emerald-50 text-emerald-700' : 'border-emerald-400/25 bg-emerald-400/5 text-emerald-300'}`}>
-                    <Headphones className="h-3 w-3" />
-                    Voice ready
-                  </span>
-                )}
               </div>
               </div>
             </div>
@@ -2154,7 +2127,7 @@ export default function SupportChatbot({ language, theme }: Props) {
                           <p className="font-cyber text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-400">
                             {requiresManualVoiceTurn ? t.iosVoiceTitle : t.voiceSessionTitle}
                           </p>
-                          <p className={`mt-1 text-xs leading-snug ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+                          <p className={`mt-1 ${panelTypography.body} leading-snug ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
                             {requiresManualVoiceTurn ? t.iosVoiceHint : t.voiceSessionSubtitle}
                           </p>
                         </div>
@@ -2342,7 +2315,7 @@ export default function SupportChatbot({ language, theme }: Props) {
                 <div key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div
                     style={{ clipPath: CHIP_CLIP }}
-                    className={`max-w-[88%] whitespace-pre-line px-3.5 py-2.5 text-sm leading-relaxed ${
+                    className={`max-w-[88%] whitespace-pre-line px-3.5 py-2.5 ${panelTypography.message} leading-relaxed ${
                       message.sender === 'user'
                         ? 'bg-gradient-to-r from-pink-600 via-orange-500 to-amber-400 text-white shadow-[0_0_16px_rgba(219,39,119,0.25)]'
                         : message.sender === 'system'
@@ -2402,7 +2375,7 @@ export default function SupportChatbot({ language, theme }: Props) {
                             <summary className="cursor-pointer list-none font-cyber text-[10px] font-bold uppercase tracking-wider text-cyan-400 transition hover:text-pink-400">
                               ▸ {card.title}
                             </summary>
-                            <p className={`mt-2 whitespace-pre-line text-xs leading-relaxed ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
+                            <p className={`mt-2 whitespace-pre-line ${panelTypography.body} leading-relaxed ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
                               {card.body}
                             </p>
                           </details>
@@ -2524,7 +2497,7 @@ export default function SupportChatbot({ language, theme }: Props) {
                     disabled={isSending}
                     placeholder={isSending ? 'Gönderiliyor...' : t.input}
                     style={{ clipPath: CHIP_CLIP }}
-                    className={`max-h-28 min-h-11 w-full resize-none border py-2.5 pl-7 pr-3 text-sm outline-none transition disabled:opacity-60 ${
+                    className={`max-h-28 min-h-11 w-full resize-none border py-2.5 pl-7 pr-3 ${panelTypography.input} outline-none transition disabled:opacity-60 ${
                       isLight
                         ? 'border-cyan-300 bg-white text-slate-900 placeholder:text-slate-400 focus:border-pink-500 focus:shadow-[0_0_14px_rgba(219,39,119,0.2)]'
                         : 'border-cyan-400/25 bg-[#0a0f18] text-white placeholder:text-slate-500 focus:border-pink-500/60 focus:shadow-[0_0_14px_rgba(219,39,119,0.25)]'
@@ -2573,54 +2546,50 @@ export default function SupportChatbot({ language, theme }: Props) {
               )}
             </div>
           </motion.aside>
-        )}
-      </AnimatePresence>
-
-      {/* Robot başlatıcı butonu (mobilde panel açıkken gizlenir, panelin kendi kapatma butonları var) */}
-      <div className={`relative shrink-0 ${isOpen ? 'hidden sm:block' : ''}`}>
-        {/* Ping halkası (butonun clip-path'i dışında kalması için sarmalayıcıda) */}
-        {!isOpen && (
-          <span
-            className="pointer-events-none absolute inset-0 border border-pink-500/60"
-            style={{ clipPath: LAUNCHER_CLIP, animation: 'cyberBotPing 2.4s ease-out infinite' }}
-          />
-        )}
-        <motion.button
-          whileHover={{ scale: 1.05, y: -2 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => setIsOpen((prev) => !prev)}
-          aria-label={t.title}
-          style={{ clipPath: LAUNCHER_CLIP }}
-          className={`pointer-events-auto relative grid h-14 w-14 place-items-center border sm:h-16 sm:w-16 ${
-            isLight
-              ? 'border-pink-500/60 bg-white/92 text-pink-600 shadow-[0_0_26px_rgba(219,39,119,0.35)]'
-              : 'border-pink-500/50 bg-[#060910]/90 text-cyan-300 shadow-[0_0_30px_rgba(219,39,119,0.35)]'
-          }`}
-        >
-          {/* Tarama dokusu */}
-          <span
-            className="pointer-events-none absolute inset-0 opacity-25"
-            style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(34,211,238,0.2) 3px, rgba(34,211,238,0.2) 4px)' }}
-          />
-          {/* Köşe aksanları */}
-          <span className="pointer-events-none absolute right-0 top-0 h-2.5 w-2.5 border-r border-t border-cyan-400/80" />
-          <span className="pointer-events-none absolute bottom-0 left-0 h-2.5 w-2.5 border-b border-l border-cyan-400/80" />
-
-          <span
-            className="absolute right-0.5 top-0.5 grid h-5 w-6 place-items-center bg-gradient-to-r from-pink-600 to-orange-500 font-cyber text-[8px] font-bold text-white"
-            style={{ clipPath: 'polygon(3px 0, 100% 0, 100% 100%, 0 100%, 0 3px)' }}
-          >
-            AI
-          </span>
-          {isOpen ? (
-            <Headphones className="relative h-6 w-6" />
-          ) : (
-            <Bot className="relative h-7 w-7" style={{ animation: 'cyberBotEyeBlink 4s infinite' }} />
           )}
-        </motion.button>
+        </AnimatePresence>
+
+        {/* Robot başlatıcı butonu — panel açık/kapanırken gizli kalır */}
+        {showLauncher && (
+          <div className="absolute inset-0">
+            <span
+              className="pointer-events-none absolute inset-0 border border-pink-500/60"
+              style={{ clipPath: LAUNCHER_CLIP, animation: 'cyberBotPing 2.4s ease-out infinite' }}
+            />
+            <motion.button
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setIsOpen(true)}
+              aria-label={t.title}
+              style={{ clipPath: LAUNCHER_CLIP }}
+              className={`pointer-events-auto relative grid h-full w-full place-items-center border ${
+                isLight
+                  ? 'border-pink-500/60 bg-white/92 text-pink-600 shadow-[0_0_26px_rgba(219,39,119,0.35)]'
+                  : 'border-pink-500/50 bg-[#060910]/90 text-cyan-300 shadow-[0_0_30px_rgba(219,39,119,0.35)]'
+              }`}
+            >
+              {/* Tarama dokusu */}
+              <span
+                className="pointer-events-none absolute inset-0 opacity-25"
+                style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(34,211,238,0.2) 3px, rgba(34,211,238,0.2) 4px)' }}
+              />
+              {/* Köşe aksanları */}
+              <span className="pointer-events-none absolute right-0 top-0 h-2.5 w-2.5 border-r border-t border-cyan-400/80" />
+              <span className="pointer-events-none absolute bottom-0 left-0 h-2.5 w-2.5 border-b border-l border-cyan-400/80" />
+
+              <span
+                className="absolute right-0.5 top-0.5 grid h-5 w-6 place-items-center bg-gradient-to-r from-pink-600 to-orange-500 font-cyber text-[8px] font-bold text-white"
+                style={{ clipPath: 'polygon(3px 0, 100% 0, 100% 100%, 0 100%, 0 3px)' }}
+              >
+                AI
+              </span>
+              <Bot className="relative h-7 w-7 sm:h-8 sm:w-8" style={{ animation: 'cyberBotEyeBlink 4s infinite' }} />
+            </motion.button>
+          </div>
+        )}
       </div>
 
-      {!isOpen && (
+      {showLauncher && !isOpen && (
         <div
           style={{ clipPath: CHIP_CLIP }}
           className={`pointer-events-none absolute bottom-1 right-[4.5rem] hidden max-w-[230px] border px-3 py-2 font-cyber text-[10px] uppercase tracking-wider backdrop-blur-xl sm:right-20 sm:block ${
